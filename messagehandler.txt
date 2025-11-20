@@ -1,0 +1,57 @@
+msg = message.get("text");
+response = Map();
+if(msg == null)
+{
+	msg_l = "";
+}
+else
+{
+	msg_l = msg.toString().trim().toLowerCase();
+}
+if(operation.equals("chat"))
+{
+	if(msg_l == "book an appointment" || msg_l == "book appointment")
+	{
+		response.put("action","context");
+		response.put("context_id","book_appt");
+		question = {"name":"dept","replies":{"Please choose a department:"},"suggestions":{"General Medicine","Dermatology","Cardiology","Pediatrics","ENT"}};
+		response.put("questions",{question});
+		return response;
+	}
+	if(msg_l == "reschedule appointment" || msg_l == "reschedule")
+	{
+		response.put("action","context");
+		response.put("context_id","reschedule_appt");
+		question = {"name":"email","replies":{"Please enter the email used for booking:"},"input":{"type":"text"}};
+		response.put("questions",{question});
+		return response;
+	}
+	if(msg_l == "cancel appointment" || msg_l == "cancel")
+	{
+		response.put("action","context");
+		response.put("context_id","cancel_appt");
+		question = {"name":"email","replies":{"Please enter the email used for booking:"},"input":{"type":"text"}};
+		response.put("questions",{question});
+		return response;
+	}
+	if(msg_l == "find earliest available doctor" || msg_l == "earliest available doctor")
+	{
+		response.put("action","context");
+		response.put("context_id","earliest");
+		question = {"name":"dept","replies":{"Which department would you like to check?"},"suggestions":{"General Medicine","Dermatology","Cardiology","Pediatrics","ENT"}};
+		response.put("questions",{question});
+		return response;
+	}
+	if(msg_l == "talk to support" || msg_l == "support")
+	{
+		response.put("action","forward");
+		response.put("replies",{"Connecting you to a healthcare assistant… Please wait."});
+		return response;
+	}
+	// fallback
+	response.put("action","reply");
+	response.put("replies",{"Sorry, I didn't catch that. Choose an option below or type your request."});
+	response.put("suggestions",{"Book an Appointment","Reschedule Appointment","Cancel Appointment","Find Earliest Available Doctor","Talk to Support"});
+	return response;
+}
+return response;

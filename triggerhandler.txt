@@ -1,0 +1,7 @@
+// Trigger Handler - greets user and shows primary options
+response = Map();
+response.put("action","reply");
+response.put("replies",{"Hello! 👋 I’m your virtual healthcare assistant. I can help you book, reschedule, or cancel doctor appointments. How can I assist you today?"});
+// Primary suggestions for fast action
+response.put("suggestions",{"Book an Appointment","Reschedule Appointment","Cancel Appointment","Find Earliest Available Doctor","Talk to Support"});
+return response;

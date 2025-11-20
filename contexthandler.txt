@@ -1,0 +1,204 @@
+response = Map();
+response.put("action","context");
+response.put("context_id",context_id);
+
+base_url = "https://google-calendar-two.vercel.app";
+
+///////////////////////////////////////////////////////
+// BOOK APPOINTMENT WITH EMAIL OTP
+///////////////////////////////////////////////////////
+
+if(context_id == "book_appt")
+{
+    // STEP 1 — NAME
+    if(answers.containsKey("dept") && !answers.containsKey("name"))
+    {
+        question = {
+            "name":"name",
+            "replies":{
+                {
+                    "text":"Great! Please enter your full name.",
+                    "field_name":"siq_name"
+                }
+            }
+        };
+        response.put("questions",{question});
+        return response;
+    }
+
+    // STEP 2 — EMAIL
+    if(answers.containsKey("name") && !answers.containsKey("email"))
+    {
+        question = {
+            "name":"email",
+            "replies":{
+                {
+                    "text":"Enter your email address (we will send OTP).",
+                    "field_name":"siq_email",
+                    "validate":{
+                        "format":"email",
+                        "error":{"Enter a valid email"}
+                    }
+                }
+            }
+        };
+        response.put("questions",{question});
+        return response;
+    }
+
+    // STEP 3 — SEND OTP (after email)
+    if(answers.containsKey("email") && !answers.containsKey("email_otp"))
+    {
+        visitor_email = answers.get("email").get("text");
+
+        payload = Map();
+        payload.put("email", visitor_email);
+
+        body_str = payload.toString();
+
+        otp_resp = invokeurl
+        [
+            url: base_url + "/send-otp"
+            type: POST
+            body: body_str
+        ];
+
+        question = {
+            "name":"email_otp",
+            "replies":{
+                {
+                    "text":"We sent a 6-digit OTP to your email. Enter it:"
+                }
+            }
+        };
+        response.put("questions",{question});
+        return response;
+    }
+
+    // STEP 4 — VERIFY OTP
+    if(answers.containsKey("email_otp") && !answers.containsKey("phone"))
+    {
+        entered_otp = answers.get("email_otp").get("text");
+        visitor_email = answers.get("email").get("text");
+
+        payload = Map();
+        payload.put("email", visitor_email);
+        payload.put("otp", entered_otp);
+
+        body_str = payload.toString();
+
+        verify_resp = invokeurl
+        [
+            url: base_url + "/verify-otp"
+            type: POST
+            body: body_str
+        ];
+
+        if(verify_resp != null && verify_resp.get("valid") == true)
+        {
+            question = {
+                "name":"phone",
+                "replies":{
+                    {
+                        "text":"OTP verified! Enter your phone number.",
+                        "field_name":"siq_phone",
+                        "validate":{
+                            "format":"phoneno",
+                            "error":{"Enter a valid phone number"}
+                        }
+                    }
+                }
+            };
+            response.put("questions",{question});
+            return response;
+        }
+        else
+        {
+            response.put("action","reply");
+            response.put("replies",{"❌ Incorrect OTP. Try again."});
+            response.put("suggestions",{"Resend OTP","Try Again"});
+            return response;
+        }
+    }
+
+    // STEP 5 — DATE
+    if(answers.containsKey("phone") && !answers.containsKey("date"))
+    {
+        question = {
+            "name":"date",
+            "replies":{"Select your preferred appointment date:"},
+            "input":{"type":"calendar"}
+        };
+        response.put("questions",{question});
+        return response;
+    }
+
+    // STEP 6 — FETCH SLOTS
+    if(answers.containsKey("date") && !answers.containsKey("slot"))
+    {
+        selected_date = answers.get("date").get("text");
+
+        payload = Map();
+        payload.put("date", selected_date);
+
+        body_str = payload.toString();
+
+        slots_resp = invokeurl
+        [
+            url: base_url + "/slots"
+            type: POST
+            body: body_str
+        ];
+
+        if(slots_resp == null || slots_resp.size() == 0)
+        {
+            response.put("action","reply");
+            response.put("replies",{"No slots available for this date."});
+            return response;
+        }
+
+        slot_options = List();
+        for each s in slots_resp
+        {
+            slot_options.add(s.get("time"));
+        }
+
+        question = {
+            "name":"slot",
+            "replies":{"Choose a time slot:"},
+            "input":{"type":"select","options":slot_options}
+        };
+
+        response.put("questions",{question});
+        return response;
+    }
+
+    // STEP 7 — CREATE APPOINTMENT
+    if(answers.containsKey("slot"))
+    {
+        payload = Map();
+        payload.put("name", answers.get("name").get("text"));
+        payload.put("email", answers.get("email").get("text"));
+        payload.put("phone", answers.get("phone").get("text"));
+        payload.put("start", answers.get("slot").get("text"));
+
+        body_str = payload.toString();
+
+        create_resp = invokeurl
+        [
+            url: base_url + "/create"
+            type: POST
+            body: body_str
+        ];
+
+        response.put("action","end");
+        response.put("replies",{
+            "🎉 Appointment confirmed!",
+            "We sent confirmation to your email."
+        });
+        return response;
+    }
+	}
+	
+
+return response;

@@ -1,0 +1,102 @@
+https://google-calendar-two.vercel.app/create
+
+====>  {
+  "kind": "calendar#event",
+  "etag": "\"3527300098268702\"",
+  "id": "lrnt69e8mpnkglk7olacdfakps",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=bHJudDY5ZThtcG5rZ2xrN29sYWNkZmFrcHMgdmluZGh5YTM1M0Bt",
+  "created": "2025-11-20T14:47:29.000Z",
+  "updated": "2025-11-20T14:47:29.134Z",
+  "summary": "Doctor Appointment - Vindhya",
+  "description": "Name: Vindhya\nEmail: vindhya3321@gmail.com\nPhone: 9345849646",
+  "creator": {
+    "email": "vindhya353@gmail.com",
+    "self": true
+  },
+  "organizer": {
+    "email": "vindhya353@gmail.com",
+    "self": true
+  },
+  "start": {
+    "dateTime": "2025-11-25T15:30:00+05:30",
+    "timeZone": "Asia/Kolkata"
+  },
+  "end": {
+    "dateTime": "2025-11-25T16:00:00+05:30",
+    "timeZone": "Asia/Kolkata"
+  },
+  "iCalUID": "lrnt69e8mpnkglk7olacdfakps@google.com",
+  "sequence": 0,
+  "attendees": [
+    {
+      "email": "vindhya3321@gmail.com",
+      "responseStatus": "needsAction"
+    }
+  ],
+  "reminders": {
+    "useDefault": true
+  },
+  "eventType": "default"
+}
+
+===========
+
+https://google-calendar-two.vercel.app/slots
+
+[
+  {
+    "time": "2025-11-24T03:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T04:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T04:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T05:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T05:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T06:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T06:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T07:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T07:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T08:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T08:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T09:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T09:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T10:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T11:00:00.000Z"
+  },
+  {
+    "time": "2025-11-24T11:30:00.000Z"
+  },
+  {
+    "time": "2025-11-24T12:00:00.000Z"
+  }
+]
+
+==========================
+
