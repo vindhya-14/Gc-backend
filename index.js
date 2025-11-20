@@ -1,4 +1,4 @@
-import express from "express";
+import { parse } from "url";
 import {
   startAuth,
   handleCallback,
@@ -6,48 +6,60 @@ import {
   createEvent,
 } from "./google.js";
 
-const app = express();
-app.use(express.json());
+export default async function handler(req, res) {
+  const { pathname } = parse(req.url, true);
 
-// 1) Visit this to start Google OAuth
-app.get("/auth", (req, res) => {
-  res.redirect(startAuth());
-});
-
-// 2) Google OAuth redirect URL
-app.get("/oauth/callback", async (req, res) => {
   try {
-    await handleCallback(req.query.code);
-    res.send("Google Calendar successfully connected! You can close this tab.");
-  } catch (err) {
-    console.error("OAuth Callback Error:", err);
-    res.status(500).send("OAuth error");
-  }
-});
+    if (pathname === "/") {
+      res.statusCode = 200;
+      res.end("Google Calendar Backend Running");
+      return;
+    }
 
-// 3) Zobot → fetch slots
-app.post("/slots", async (req, res) => {
-  try {
-    const { date } = req.body;
-    const slots = await getFreeBusy(date);
-    res.json(slots);
+    if (pathname === "/auth") {
+      const url = startAuth();
+      res.writeHead(302, { Location: url });
+      res.end();
+      return;
+    }
+
+    if (pathname === "/oauth/callback") {
+      const urlObj = new URL(req.url, `https://${req.headers.host}`);
+      const code = urlObj.searchParams.get("code");
+
+      await handleCallback(code);
+
+      res.end("Authentication Successful! You can close this tab.");
+      return;
+    }
+
+    if (pathname === "/slots" && req.method === "POST") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      const { date } = JSON.parse(body);
+
+      const slots = await getFreeBusy(date);
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(slots));
+      return;
+    }
+
+    if (pathname === "/create" && req.method === "POST") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      const inputs = JSON.parse(body);
+
+      const event = await createEvent(inputs);
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(event));
+      return;
+    }
+
+    res.statusCode = 404;
+    res.end("Not Found");
   } catch (err) {
     console.error(err);
-    res.status(500).send("Error fetching slots");
+    res.statusCode = 500;
+    res.end("Server Error");
   }
-});
-
-// 4) Zobot → create appointment
-app.post("/create", async (req, res) => {
-  try {
-    const event = await createEvent(req.body);
-    res.json(event);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error creating event");
-  }
-});
-
-// Run locally
-app.listen(3000, () => console.log("Server running on port 3000"));
-export default app;
+}
