@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Complete Payment</title>
+
+    <!-- Razorpay -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Inter", sans-serif;
+            background: linear-gradient(135deg, #0099ff, #66ccff);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+
+        .card {
+            background: #ffffff;
+            color: #333;
+            width: 90%;
+            max-width: 420px;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0px 12px 30px rgba(0, 0, 0, 0.15);
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .card h2 {
+            margin: 0 0 10px;
+            font-weight: 600;
+        }
+
+        .card p {
+            font-size: 15px;
+            opacity: 0.8;
+            margin: 6px 0 20px;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0099ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0px);
+            }
+        }
+
+        .success {
+            color: #0a9d48;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .error {
+            color: #d93025;
+            font-weight: bold;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+        <h2>Processing Payment</h2>
+        <p>Please wait while we prepare your secure checkout…</p>
+
+        <div class="loader"></div>
+
+        <p id="status">Connecting to Razorpay...</p>
+    </div>
+
+    <script>
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+
+            const amount = params.get("amount");
+            const name = params.get("name");
+            const email = params.get("email");
+            const phone = params.get("phone");
+            const start = params.get("start");
+
+            document.getElementById("status").innerText = "Generating order...";
+
+            // Step 1: Create Razorpay order
+            const orderRes = await fetch("/api/create-order", {
+                method: "POST",
+                body: JSON.stringify({ amount: Number(amount), email }),
+            });
+            const orderData = await orderRes.json();
+
+            if (!orderData.order) {
+                document.getElementById("status").innerHTML =
+                    "<span class='error'>❌ Failed to create payment order.</span>";
+                return;
+            }
+
+            // Step 2: Razorpay checkout
+            const options = {
+                key: orderData.key_id,
+                amount: orderData.order.amount,
+                currency: "INR",
+                order_id: orderData.order.id,
+                name: "Clinic Appointment",
+                description: "Doctor Consultation Fees",
+                image: "https://cdn-icons-png.flaticon.com/512/2966/2966327.png",
+                handler: async function (response) {
+                    document.getElementById("status").innerText = "Verifying payment…";
+
+                    // Verify payment
+                    const verifyRes = await fetch("/api/verify-payment", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            order_id: response.razorpay_order_id,
+                            payment_id: response.razorpay_payment_id,
+                            signature: response.razorpay_signature,
+                            name,
+                            email,
+                            phone,
+                            start
+                        }),
+                    });
+
+                    const v = await verifyRes.json();
+
+                    if (v.success) {
+                        document.querySelector(".card").innerHTML = `
+                            <h2>Payment Successful 🎉</h2>
+                            <p class="success">Your appointment has been booked.</p>
+                            <p><b>Date & Time:</b><br>${new Date(start).toLocaleString()}</p>
+                        `;
+                    } else {
+                        document.getElementById("status").innerHTML =
+                            "<span class='error'>❌ Payment Verification Failed.</span>";
+                    }
+                },
+
+                prefill: { name, email, contact: phone },
+                theme: { color: "#0099ff" },
+            };
+
+            document.getElementById("status").innerText = "Opening secure payment window...";
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+
+        init();
+    </script>
+
+</body>
+
+</html>

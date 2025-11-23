@@ -1,33 +1,29 @@
-// routes/verify-payment.js
-import { verifyPayment } from "../razorpay.js";
-import { createEvent } from "../google.js";
+import { verifyPayment } from "../lib/razorpay.js";
+import { createEvent } from "../lib/google.js";
 
 export default async function handler(req, res) {
   try {
     let body = "";
     for await (const chunk of req) body += chunk;
-    const data = body ? JSON.parse(body) : {};
 
+    const data = body ? JSON.parse(body) : {};
     const { order_id, payment_id, signature, name, email, phone, start } = data;
 
     if (!order_id || !payment_id || !signature) {
       res.statusCode = 400;
-      res.end(
-        JSON.stringify({ error: "Missing Razorpay verification fields" })
-      );
+      res.end(JSON.stringify({ error: "Missing fields" }));
       return;
     }
 
-    const valid = verifyPayment(order_id, payment_id, signature);
+    const ok = verifyPayment(order_id, payment_id, signature);
 
-    if (!valid) {
+    if (!ok) {
       res.statusCode = 400;
       res.end(JSON.stringify({ error: "Invalid signature" }));
       return;
     }
 
-    // Payment verified → create calendar event (your existing function)
-    // start must be ISO string accepted by your calendar createEvent
+    // Payment OK → Create event
     const evt = await createEvent({ name, email, phone, start });
 
     res.setHeader("Content-Type", "application/json");
