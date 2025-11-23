@@ -259,6 +259,7 @@ export default async function handler(req, res) {
       const payment_id = urlObj.searchParams.get("razorpay_payment_id");
       const link_id = urlObj.searchParams.get("razorpay_payment_link_id");
 
+      // Razorpay hits webhook twice sometimes => avoid errors
       if (!payment_id || !link_id) {
         res.statusCode = 200;
         res.end("OK");
@@ -274,11 +275,14 @@ export default async function handler(req, res) {
       const phone = notes.phone;
       const start = notes.start;
 
-      // Create the actual Google Calendar event
-      const evt = await createEvent({ name, email, phone, start });
+      // Create Google Calendar event
+      await createEvent({ name, email, phone, start });
 
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ success: true, event: evt }));
+      // Redirect user to beautiful thank-you page
+      res.writeHead(302, {
+        Location: "https://" + req.headers.host + "/thank-you",
+      });
+      res.end();
       return;
     }
 
