@@ -1,6 +1,6 @@
 // routes/verify-payment.js
 import { verifyPayment } from "../razorpay.js";
-import { createEvent } from "../google";
+import { createEvent } from "../google.js";
 
 export default async function handler(req, res) {
   try {
