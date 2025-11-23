@@ -1,5 +1,5 @@
 // routes/create-order.js
-import { createOrder } from "../utils/razorpay.js";
+import { createOrder } from "../razorpay";
 
 export default async function handler(req, res) {
   try {
