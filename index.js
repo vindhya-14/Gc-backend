@@ -2,7 +2,6 @@
 import { parse } from "url";
 import googleMod from "./google.js";
 import Razorpay from "razorpay";
-import crypto from "crypto";
 
 const {
   startAuth,
@@ -16,7 +15,7 @@ const {
   verifyOTP,
 } = googleMod;
 
-// helper: read JSON body
+// helper: read JSON body for POST
 async function readBody(req) {
   let body = "";
   for await (const chunk of req) body += chunk;
@@ -238,7 +237,7 @@ export default async function handler(req, res) {
           description: "Appointment Payment",
           notes: { name, email, phone, start },
           callback_url: "https://" + req.headers.host + "/payment-webhook",
-          callback_method: "post",
+          callback_method: "get", // IMPORTANT ✔
         });
 
         res.setHeader("Content-Type", "application/json");
@@ -254,36 +253,32 @@ export default async function handler(req, res) {
     // ====================================================
     // 🔵 PAYMENT WEBHOOK (After payment success)
     // ====================================================
-    if (pathname === "/payment-webhook" && req.method === "POST") {
-      const body = await readBody(req);
-      const event = body.event;
+    if (pathname === "/payment-webhook" && req.method === "GET") {
+      const urlObj = new URL(req.url, `https://${req.headers.host}`);
 
-      if (event === "payment_link.paid") {
-        try {
-          const payment = body.payload.payment.entity;
-          const notes = payment.notes;
+      const payment_id = urlObj.searchParams.get("razorpay_payment_id");
+      const link_id = urlObj.searchParams.get("razorpay_payment_link_id");
 
-          const name = notes.name;
-          const email = notes.email;
-          const phone = notes.phone;
-          const start = notes.start;
-
-          // Create Google Calendar event
-          const evt = await createEvent({ name, email, phone, start });
-
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ success: true, event: evt }));
-          return;
-        } catch (err) {
-          console.error("Webhook Error:", err);
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: "Webhook handling failed" }));
-          return;
-        }
+      if (!payment_id || !link_id) {
+        res.statusCode = 200;
+        res.end("OK");
+        return;
       }
 
-      res.statusCode = 200;
-      res.end("Unhandled webhook");
+      // Fetch payment details from Razorpay
+      const payment = await razor.payments.fetch(payment_id);
+      const notes = payment.notes;
+
+      const name = notes.name;
+      const email = notes.email;
+      const phone = notes.phone;
+      const start = notes.start;
+
+      // Create the actual Google Calendar event
+      const evt = await createEvent({ name, email, phone, start });
+
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ success: true, event: evt }));
       return;
     }
 
