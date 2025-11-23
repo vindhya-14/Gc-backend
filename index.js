@@ -287,7 +287,7 @@ export default async function handler(req, res) {
     }
 
     // ====================================================
-    // 🔵 AI Symptom Checker → Suggest Department (Gemini 2.5)
+    // 🔵 AI Symptom Checker → Suggest Department (Gemini 2.0)
     // ====================================================
     if (pathname === "/ai/symptom-check" && req.method === "POST") {
       const body = await readBody(req);
@@ -300,33 +300,33 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Gemini AI (Latest Quickstart Library)
-        const { GoogleGenAI } = await import("@google/genai");
+        // Gemini AI Latest Quickstart SDK
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
 
-        const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+        const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const prompt = `
-You are an expert medical triage assistant.
-Analyze the symptoms and recommend the best medical department.
+You are an AI medical triage assistant.
+Analyze the symptoms and recommend the most appropriate medical department.
 
-Return ONLY valid JSON in this format:
+Return ONLY a valid JSON object:
 
 {
   "department": "<best suitable department>",
   "severity": "<low | medium | high>",
-  "possible_conditions": ["<likely conditions>"],
-  "recommended_action": "<next medical step>",
-  "reason": "<justification based on symptoms>"
+  "possible_conditions": ["<likely disease 1>", "<disease 2>"],
+  "recommended_action": "<immediate steps / checkup>",
+  "reason": "<short justification>"
 }
 
 Symptoms: ${symptoms}
 `;
 
-        const result = await client.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-        });
+        const result = await model.generateContent(prompt);
 
+        // FIX: Correct way to extract text
         const output = result.response.text();
 
         res.setHeader("Content-Type", "application/json");
