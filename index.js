@@ -286,6 +286,61 @@ export default async function handler(req, res) {
       return;
     }
 
+    // ====================================================
+    // 🔵 AI Symptom Checker → Suggest Department (Improved)
+    // ====================================================
+    if (pathname === "/ai/symptom-check" && req.method === "POST") {
+      const body = await readBody(req);
+      const symptoms = body.symptoms;
+
+      if (!symptoms) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing symptoms" }));
+        return;
+      }
+
+      try {
+        // Gemini AI
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `
+You are an expert medical triage and symptom analysis assistant.
+Analyze the patient symptoms below and determine the most appropriate medical department or specialist.
+
+Your response must be ONLY valid JSON in the following structure:
+{
+  "department": "<best suitable medical department>",
+  "severity": "<low | medium | high>",
+  "possible_conditions": ["<likely conditions>"],
+  "recommended_action": "<immediate steps like ER visit, home care, or appointment>",
+  "reason": "<brief justification based on symptoms>"
+}
+
+Important rules:
+- Do NOT include text outside JSON.
+- Use medical reasoning.
+- If symptoms are unclear, respond with severity "unknown" and request more info in "recommended_action".
+
+Symptoms: ${symptoms}
+    `;
+
+        const response = await model.generateContent(prompt);
+        const text = response.response.text();
+
+        res.setHeader("Content-Type", "application/json");
+        res.end(text);
+        return;
+      } catch (err) {
+        console.error("AI Error:", err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: "AI processing failed" }));
+        return;
+      }
+    }
+
     // =======================
     // 404 Fallback
     // =======================
