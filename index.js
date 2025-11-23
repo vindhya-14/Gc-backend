@@ -287,7 +287,7 @@ export default async function handler(req, res) {
     }
 
     // ====================================================
-    // 🔵 AI Symptom Checker → Suggest Department (Improved)
+    // 🔵 AI Symptom Checker → Suggest Department (Gemini 2.5)
     // ====================================================
     if (pathname === "/ai/symptom-check" && req.method === "POST") {
       const body = await readBody(req);
@@ -300,40 +300,37 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Gemini AI
-        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        // Gemini AI (Latest Quickstart Library)
+        const { GoogleGenAI } = await import("@google/genai");
 
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({
-          model: "gemini-1.5-flash-latest",
-        }); 
+        const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         const prompt = `
-You are an expert medical triage and symptom analysis assistant.
-Analyze the patient symptoms below and determine the most appropriate medical department or specialist.
+You are an expert medical triage assistant.
+Analyze the symptoms and recommend the best medical department.
 
-Your response must be ONLY valid JSON in the following structure:
+Return ONLY valid JSON in this format:
+
 {
-  "department": "<best suitable medical department>",
+  "department": "<best suitable department>",
   "severity": "<low | medium | high>",
   "possible_conditions": ["<likely conditions>"],
-  "recommended_action": "<immediate steps like ER visit, home care, or appointment>",
-  "reason": "<brief justification based on symptoms>"
+  "recommended_action": "<next medical step>",
+  "reason": "<justification based on symptoms>"
 }
 
-Important rules:
-- Do NOT include text outside JSON.
-- Use medical reasoning.
-- If symptoms are unclear, respond with severity "unknown" and request more info in "recommended_action".
-
 Symptoms: ${symptoms}
-    `;
+`;
 
-        const response = await model.generateContent(prompt);
-        const text = response.response.text();
+        const result = await client.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        });
+
+        const output = result.response.text();
 
         res.setHeader("Content-Type", "application/json");
-        res.end(text);
+        res.end(output);
         return;
       } catch (err) {
         console.error("AI Error:", err);
