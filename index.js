@@ -1,6 +1,8 @@
-// index.js (vercel serverless)
+// index.js (Vercel serverless)
 import { parse } from "url";
 import googleMod from "./google.js";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 
 const {
   startAuth,
@@ -25,6 +27,12 @@ async function readBody(req) {
     return {};
   }
 }
+
+// Razorpay Instance
+const razor = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 export default async function handler(req, res) {
   const { pathname } = parse(req.url, true);
@@ -70,7 +78,7 @@ export default async function handler(req, res) {
     }
 
     // =======================
-    // Slots
+    // Fetch Available Slots
     // =======================
     if (pathname === "/slots" && req.method === "POST") {
       const body = await readBody(req);
@@ -90,7 +98,7 @@ export default async function handler(req, res) {
     }
 
     // =======================
-    // Create (Calendar)
+    // Create Calendar Event
     // =======================
     if (pathname === "/create" && req.method === "POST") {
       const body = await readBody(req);
@@ -202,10 +210,80 @@ export default async function handler(req, res) {
         return;
       }
 
-      const ok = await verifyOTP(email);
+      const ok = await verifyOTP(email, otp);
 
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ valid: ok }));
+      return;
+    }
+
+    // ====================================================
+    // 🔵 CREATE PAYMENT LINK (Razorpay)
+    // ====================================================
+    if (pathname === "/create-payment-link" && req.method === "POST") {
+      const body = await readBody(req);
+      const { name, email, phone, amount, start } = body;
+
+      if (!name || !email || !phone || !amount || !start) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing fields" }));
+        return;
+      }
+
+      try {
+        const link = await razor.paymentLink.create({
+          amount: amount * 100,
+          currency: "INR",
+          customer: { name, email, contact: phone },
+          description: "Appointment Payment",
+          notes: { name, email, phone, start },
+          callback_url: "https://" + req.headers.host + "/payment-webhook",
+          callback_method: "post",
+        });
+
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ pay_url: link.short_url }));
+      } catch (err) {
+        console.error("Payment Link Error:", err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: "Payment link creation failed" }));
+      }
+      return;
+    }
+
+    // ====================================================
+    // 🔵 PAYMENT WEBHOOK (After payment success)
+    // ====================================================
+    if (pathname === "/payment-webhook" && req.method === "POST") {
+      const body = await readBody(req);
+      const event = body.event;
+
+      if (event === "payment_link.paid") {
+        try {
+          const payment = body.payload.payment.entity;
+          const notes = payment.notes;
+
+          const name = notes.name;
+          const email = notes.email;
+          const phone = notes.phone;
+          const start = notes.start;
+
+          // Create Google Calendar event
+          const evt = await createEvent({ name, email, phone, start });
+
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ success: true, event: evt }));
+          return;
+        } catch (err) {
+          console.error("Webhook Error:", err);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "Webhook handling failed" }));
+          return;
+        }
+      }
+
+      res.statusCode = 200;
+      res.end("Unhandled webhook");
       return;
     }
 
