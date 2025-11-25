@@ -201,20 +201,54 @@ export async function createEvent({ name, email, phone, start }) {
   const endDt = new Date(startDt.getTime() + 30 * 60000);
 
   const eventBody = {
-    summary: `Doctor Appointment - ${name}`,
-    description: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}`,
-    start: { dateTime: startDt.toISOString() },
-    end: { dateTime: endDt.toISOString() },
-    attendees: email ? [{ email }] : [],
+    summary: `Appointment – ${name}`,
+    description: `
+Patient Name: ${name}
+Email: ${email}
+Phone: ${phone}
+
+Booked via CliniQ Assist.
+    `.trim(),
+
+    start: {
+      dateTime: startDt.toISOString(),
+      timeZone: "Asia/Kolkata",
+    },
+    end: {
+      dateTime: endDt.toISOString(),
+      timeZone: "Asia/Kolkata",
+    },
+
+    attendees: [
+      {
+        email: email,
+        displayName: name,
+      },
+    ],
+
+    // ⭐ THIS IS WHAT HIDES YOUR EMAIL FROM PUBLIC VIEW
+    organizer: {
+      email: process.env.MAIL_USER, // REQUIRED but hidden in UI
+      displayName: "CliniQ Assist", // SHOWN INSTEAD OF EMAIL
+    },
+
+    creator: {
+      email: process.env.MAIL_USER,
+      displayName: "CliniQ Assist",
+    },
+
+    reminders: {
+      useDefault: true,
+    },
   };
 
-  const inserted = await calendar.events.insert({
+  const created = await calendar.events.insert({
     calendarId: "primary",
+    sendUpdates: "all",
     requestBody: eventBody,
-    sendUpdates: "all", // sends email invites to attendees
   });
 
-  return inserted.data;
+  return created.data;
 }
 
 // list upcoming events for an email (returns { id, summary, start })
