@@ -121,7 +121,7 @@ export async function getFreeBusy(date, tzOffset = "+05:30") {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
 
-  // Build times in local zone by appending offset
+  // Day boundaries (9 AM – 6 PM)
   const start = new Date(date + "T09:00:00" + tzOffset);
   const end = new Date(date + "T18:00:00" + tzOffset);
 
@@ -133,25 +133,64 @@ export async function getFreeBusy(date, tzOffset = "+05:30") {
     },
   });
 
-  const busy =
-    (res.data &&
-      res.data.calendars &&
-      res.data.calendars.primary &&
-      res.data.calendars.primary.busy) ||
-    [];
+  const busy = res?.data?.calendars?.primary?.busy
+    ? res.data.calendars.primary.busy
+    : [];
 
-  const slots = [];
+  const slotList = [];
   let cursor = new Date(start);
+
   while (cursor < end) {
     const next = new Date(cursor.getTime() + 30 * 60000);
+
     const conflict = busy.some(
       (b) => new Date(b.start) < next && new Date(b.end) > cursor
     );
-    if (!conflict) slots.push({ time: cursor.toISOString() });
+
+    if (!conflict) {
+      slotList.push({
+        iso: cursor.toISOString(),
+        label: cursor.toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        hour: cursor.getHours(),
+      });
+    }
+
     cursor = next;
   }
 
-  return slots;
+  // Group into sessions
+  const morning = slotList.filter((s) => s.hour >= 9 && s.hour < 12);
+  const afternoon = slotList.filter((s) => s.hour >= 12 && s.hour < 15);
+  const evening = slotList.filter((s) => s.hour >= 15 && s.hour < 18);
+
+  return {
+    date, // "2025-12-10"
+    readableDate: new Date(date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    isFullyBooked: slotList.length === 0,
+    totalSlots: slotList.length,
+
+    morning: morning.map((s) => ({
+      time: s.label,
+      value: s.iso,
+    })),
+
+    afternoon: afternoon.map((s) => ({
+      time: s.label,
+      value: s.iso,
+    })),
+
+    evening: evening.map((s) => ({
+      time: s.label,
+      value: s.iso,
+    })),
+  };
 }
 
 export async function createEvent({ name, email, phone, start }) {
