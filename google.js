@@ -197,11 +197,20 @@ export async function createEvent({ name, email, phone, start }) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
 
+  // 🔥 Get the authenticated Google account email
+  const userinfo = await auth.request({
+    url: "https://www.googleapis.com/oauth2/v2/userinfo",
+  });
+
+  const authEmail = userinfo?.data?.email;
+  console.log("Authenticated Google Account:", authEmail);
+
   const startDt = new Date(start);
   const endDt = new Date(startDt.getTime() + 30 * 60000);
 
   const eventBody = {
-    summary: `CliniQ Assist – Appointment for ${name}`, // ⭐ CLEAN SUBJECT
+    // ⭐ CLEAN & PROFESSIONAL SUBJECT LINE
+    summary: `CliniQ Assist – Appointment for ${name}`,
 
     description: `
 Patient Name: ${name}
@@ -227,14 +236,14 @@ Booked via CliniQ Assist.
       },
     ],
 
-    // ⭐ MUST MATCH GOOGLE CALENDAR ACCOUNT
+    // ⭐ NO MORE UNKNOWN SENDER — auto match OAuth account
     organizer: {
-      email: "vindhya353@gmail.com",
+      email: authEmail, // must match OAuth Google Calendar owner
       displayName: "CliniQ Assist",
     },
 
     creator: {
-      email: "vindhya353@gmail.com",
+      email: authEmail, // must match same Google account
       displayName: "CliniQ Assist",
     },
 
