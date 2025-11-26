@@ -201,7 +201,8 @@ export async function createEvent({ name, email, phone, start }) {
   const endDt = new Date(startDt.getTime() + 30 * 60000);
 
   const eventBody = {
-    summary: `Appointment – ${name}`,
+    summary: `CliniQ Assist – Appointment for ${name}`, // ⭐ CLEAN SUBJECT
+
     description: `
 Patient Name: ${name}
 Email: ${email}
@@ -226,20 +227,18 @@ Booked via CliniQ Assist.
       },
     ],
 
-    // ⭐ THIS IS WHAT HIDES YOUR EMAIL FROM PUBLIC VIEW
+    // ⭐ MUST MATCH GOOGLE CALENDAR ACCOUNT
     organizer: {
-      email: process.env.MAIL_USER, // REQUIRED but hidden in UI
-      displayName: "CliniQ Assist", // SHOWN INSTEAD OF EMAIL
-    },
-
-    creator: {
-      email: process.env.MAIL_USER,
+      email: "vindhya353@gmail.com",
       displayName: "CliniQ Assist",
     },
 
-    reminders: {
-      useDefault: true,
+    creator: {
+      email: "vindhya353@gmail.com",
+      displayName: "CliniQ Assist",
     },
+
+    reminders: { useDefault: true },
   };
 
   const created = await calendar.events.insert({
