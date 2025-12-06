@@ -1,8 +1,10 @@
-// index.js (Vercel serverless)
 import { parse } from "url";
-import googleMod from "./google.js";
 import Razorpay from "razorpay";
+import dotenv from "dotenv";
+dotenv.config();
 
+// Import Google Calendar functions
+import googleMod from "./google.js";
 const {
   startAuth,
   handleCallback,
@@ -11,23 +13,25 @@ const {
   listEvents,
   updateEvent,
   deleteEvent,
-  sendOTP,
-  verifyOTP,
 } = googleMod;
 
-// helper: read JSON body for POST
+// Import OTP + Email helpers
+import { sendOTP, verifyOTP } from "./otp";
+import { sendConfirmationEmail } from "./sendEmail.js";
+
+// Read JSON body helper
 async function readBody(req) {
   let body = "";
   for await (const chunk of req) body += chunk;
   if (!body) return {};
   try {
     return JSON.parse(body);
-  } catch (e) {
+  } catch {
     return {};
   }
 }
 
-// Razorpay Instance
+// Razorpay instance
 const razor = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
@@ -37,18 +41,18 @@ export default async function handler(req, res) {
   const { pathname } = parse(req.url, true);
 
   try {
-    // =======================
-    // Health Check
-    // =======================
+    /********************************************
+     HEALTH CHECK
+    ********************************************/
     if (pathname === "/" && req.method === "GET") {
       res.setHeader("Content-Type", "text/plain");
-      res.end("Google Calendar Backend Running");
+      res.end("CliniQ Assist Backend Running");
       return;
     }
 
-    // =======================
-    // OAuth Start
-    // =======================
+    /********************************************
+     OAUTH AUTH FLOW
+    ********************************************/
     if (pathname === "/auth" && req.method === "GET") {
       const url = startAuth();
       res.writeHead(302, { Location: url });
@@ -56,9 +60,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // =======================
-    // OAuth Callback
-    // =======================
     if (pathname === "/oauth/callback" && req.method === "GET") {
       const urlObj = new URL(req.url, `https://${req.headers.host}`);
       const code = urlObj.searchParams.get("code");
@@ -72,16 +73,15 @@ export default async function handler(req, res) {
       await handleCallback(code);
 
       res.setHeader("Content-Type", "text/html");
-      res.end("<h3>Authentication Successful! You can close this window.</h3>");
+      res.end("<h3>Authentication Successful! You may close this window.</h3>");
       return;
     }
 
-    // =======================
-    // Fetch Available Slots
-    // =======================
+    /********************************************
+     FETCH AVAILABLE SLOTS
+    ********************************************/
     if (pathname === "/slots" && req.method === "POST") {
-      const body = await readBody(req);
-      const date = body.date;
+      const { date } = await readBody(req);
 
       if (!date) {
         res.statusCode = 400;
@@ -96,12 +96,11 @@ export default async function handler(req, res) {
       return;
     }
 
-    // =======================
-    // Create Calendar Event
-    // =======================
+    /********************************************
+     CREATE GOOGLE CALENDAR EVENT
+    ********************************************/
     if (pathname === "/create" && req.method === "POST") {
-      const body = await readBody(req);
-      const { name, email, phone, start } = body;
+      const { name, email, phone, start } = await readBody(req);
 
       if (!name || !email || !start) {
         res.statusCode = 400;
@@ -116,12 +115,11 @@ export default async function handler(req, res) {
       return;
     }
 
-    // =======================
-    // List Events
-    // =======================
+    /********************************************
+     LIST EVENTS
+    ********************************************/
     if (pathname === "/list" && req.method === "POST") {
-      const body = await readBody(req);
-      const email = body.email;
+      const { email } = await readBody(req);
 
       if (!email) {
         res.statusCode = 400;
@@ -136,12 +134,11 @@ export default async function handler(req, res) {
       return;
     }
 
-    // =======================
-    // Update Event
-    // =======================
+    /********************************************
+     UPDATE EVENT
+    ********************************************/
     if (pathname === "/update" && req.method === "POST") {
-      const body = await readBody(req);
-      const { eventId, start } = body;
+      const { eventId, start } = await readBody(req);
 
       if (!eventId || !start) {
         res.statusCode = 400;
@@ -156,12 +153,11 @@ export default async function handler(req, res) {
       return;
     }
 
-    // =======================
-    // Delete Event
-    // =======================
+    /********************************************
+     DELETE EVENT
+    ********************************************/
     if (pathname === "/delete" && req.method === "POST") {
-      const body = await readBody(req);
-      const { eventId } = body;
+      const { eventId } = await readBody(req);
 
       if (!eventId) {
         res.statusCode = 400;
@@ -176,52 +172,59 @@ export default async function handler(req, res) {
       return;
     }
 
-    // =======================
-    // Send OTP
-    // =======================
+    /********************************************
+     SEND OTP (PHONE ONLY)
+    ********************************************/
     if (pathname === "/send-otp" && req.method === "POST") {
-      const body = await readBody(req);
-      const email = body.email;
+      const { phone } = await readBody(req);
 
-      if (!email) {
+      if (!phone) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing email" }));
+        res.end(JSON.stringify({ error: "Missing phone number" }));
         return;
       }
 
-      await sendOTP(email);
-
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ success: true }));
+      try {
+        await sendOTP(phone);
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        console.error("OTP Error:", err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: "Failed to send OTP" }));
+      }
       return;
     }
 
-    // =======================
-    // Verify OTP
-    // =======================
+    /********************************************
+     VERIFY OTP (PHONE ONLY)
+    ********************************************/
     if (pathname === "/verify-otp" && req.method === "POST") {
-      const body = await readBody(req);
-      const { email, otp } = body;
+      const { phone, otp } = await readBody(req);
 
-      if (!email || !otp) {
+      if (!phone || !otp) {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: "Missing fields" }));
         return;
       }
 
-      const ok = await verifyOTP(email, otp);
-
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ valid: ok }));
+      try {
+        const ok = await verifyOTP(phone, otp);
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ valid: ok }));
+      } catch (err) {
+        console.error("Verify OTP Error:", err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: "OTP verification failed" }));
+      }
       return;
     }
 
-    // ====================================================
-    // 🔵 CREATE PAYMENT LINK (Razorpay)
-    // ====================================================
+    /********************************************
+     PAYMENT LINK (RAZORPAY)
+    ********************************************/
     if (pathname === "/create-payment-link" && req.method === "POST") {
-      const body = await readBody(req);
-      const { name, email, phone, amount, start } = body;
+      const { name, email, phone, amount, start } = await readBody(req);
 
       if (!name || !email || !phone || !amount || !start) {
         res.statusCode = 400;
@@ -237,7 +240,7 @@ export default async function handler(req, res) {
           description: "Appointment Payment",
           notes: { name, email, phone, start },
           callback_url: "https://" + req.headers.host + "/payment-webhook",
-          callback_method: "get", // IMPORTANT ✔
+          callback_method: "get",
         });
 
         res.setHeader("Content-Type", "application/json");
@@ -250,23 +253,21 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ====================================================
-    // 🔵 PAYMENT WEBHOOK (After payment success)
-    // ====================================================
+    /********************************************
+     PAYMENT WEBHOOK → CONFIRM APPOINTMENT
+    ********************************************/
     if (pathname === "/payment-webhook" && req.method === "GET") {
       const urlObj = new URL(req.url, `https://${req.headers.host}`);
 
       const payment_id = urlObj.searchParams.get("razorpay_payment_id");
       const link_id = urlObj.searchParams.get("razorpay_payment_link_id");
 
-      // Razorpay hits webhook twice sometimes => avoid errors
       if (!payment_id || !link_id) {
         res.statusCode = 200;
         res.end("OK");
         return;
       }
 
-      // Fetch payment details from Razorpay
       const payment = await razor.payments.fetch(payment_id);
       const notes = payment.notes;
 
@@ -275,10 +276,16 @@ export default async function handler(req, res) {
       const phone = notes.phone;
       const start = notes.start;
 
-      // Create Google Calendar event
-      await createEvent({ name, email, phone, start });
+      const evt = await createEvent({ name, email, phone, start });
 
-      // Redirect user to beautiful thank-you page
+      // Send confirmation email to patient
+      await sendConfirmationEmail({
+        to: email,
+        name,
+        appointmentId: evt.id,
+        date: start,
+      });
+
       res.writeHead(302, {
         Location: "https://" + req.headers.host + "/thank-you",
       });
@@ -286,63 +293,9 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ====================================================
-    // 🔵 AI Symptom Checker → Suggest Department (Gemini 2.0)
-    // ====================================================
-    if (pathname === "/ai/symptom-check" && req.method === "POST") {
-      const body = await readBody(req);
-      const symptoms = body.symptoms;
-
-      if (!symptoms) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing symptoms" }));
-        return;
-      }
-
-      try {
-        // Gemini AI Latest Quickstart SDK
-        const { GoogleGenerativeAI } = await import("@google/generative-ai");
-
-        const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-        const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        const prompt = `
-You are an AI medical triage assistant.
-Analyze the symptoms and recommend the most appropriate medical department.
-
-Return ONLY a valid JSON object:
-
-{
-  "department": "<best suitable department>",
-  "severity": "<low | medium | high>",
-  "possible_conditions": ["<likely disease 1>", "<disease 2>"],
-  "recommended_action": "<immediate steps / checkup>",
-  "reason": "<short justification>"
-}
-
-Symptoms: ${symptoms}
-`;
-
-        const result = await model.generateContent(prompt);
-
-        // FIX: Correct way to extract text
-        const output = result.response.text();
-
-        res.setHeader("Content-Type", "application/json");
-        res.end(output);
-        return;
-      } catch (err) {
-        console.error("AI Error:", err);
-        res.statusCode = 500;
-        res.end(JSON.stringify({ error: "AI processing failed" }));
-        return;
-      }
-    }
-
-    // =======================
-    // 404 Fallback
-    // =======================
+    /********************************************
+     FALLBACK
+    ********************************************/
     res.statusCode = 404;
     res.end("Not Found");
   } catch (err) {

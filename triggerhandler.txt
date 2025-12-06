@@ -1,7 +1,5 @@
-// Trigger Handler - greets user and shows primary options
 response = Map();
 response.put("action","reply");
-response.put("replies",{"Hello! 👋 I’m your virtual healthcare assistant. I can help you book, reschedule, or cancel doctor appointments. How can I assist you today?"});
-// Primary suggestions for fast action
-response.put("suggestions",{"Book an Appointment","Reschedule Appointment","Cancel Appointment","Find Earliest Available Doctor","Talk to Support"});
+response.put("replies",{"🌿 Hello! You’re chatting with **CliniQ Assist**.\nI’m here to make your healthcare easier. What can I help you with?"});
+response.put("suggestions",{"Book Appointment","Reschedule Appointment","Cancel Appointment","AI Symptom Checker"});
 return response;

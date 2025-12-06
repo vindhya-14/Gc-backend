@@ -1,22 +1,22 @@
-// google.js
 import { google } from "googleapis";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
 
-// Google OAuth Configuration (env)
+// Google OAuth Configuration
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URL = process.env.REDIRECT_URL;
 
-// Supabase Configuration (env)
+// Supabase Configuration
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Mail config (env)
+// Mail config
 const MAIL_USER = process.env.MAIL_USER;
 const MAIL_PASS = process.env.MAIL_PASS;
 
-// Basic validations
 if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URL) {
   throw new Error(
     "Missing Google OAuth env vars (CLIENT_ID/CLIENT_SECRET/REDIRECT_URL)."
@@ -33,7 +33,6 @@ if (!MAIL_USER || !MAIL_PASS) {
   );
 }
 
-// Supabase client (server-side key)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Google OAuth client
@@ -44,7 +43,6 @@ const oauth2Client = new google.auth.OAuth2(
 );
 const SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
-// --- Token helpers (Supabase table 'oauth_tokens') ---
 async function getTokens() {
   const { data, error } = await supabase
     .from("oauth_tokens")
@@ -70,7 +68,6 @@ async function saveTokens(tokens) {
   if (error) console.error("Supabase saveTokens error:", error);
 }
 
-// --- OAuth helpers ---
 export function startAuth() {
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
@@ -84,7 +81,6 @@ export async function handleCallback(code) {
   await saveTokens(tokens);
 }
 
-// Ensure oauth2Client has valid credentials (refresh if required)
 async function authorize() {
   const stored = await getTokens();
   if (!stored || !stored.refresh_token) {
@@ -99,11 +95,9 @@ async function authorize() {
     expiry_date: stored.expiry_date,
   });
 
-  // refresh if near expiry
   if (!stored.expiry_date || Number(stored.expiry_date) <= Date.now() + 60000) {
     const { credentials } = await oauth2Client.refreshAccessToken();
     const newTokens = credentials || {};
-    // ensure refresh_token preserved if absent in refresh response
     if (!newTokens.refresh_token && stored.refresh_token) {
       newTokens.refresh_token = stored.refresh_token;
     }
@@ -114,14 +108,11 @@ async function authorize() {
   return oauth2Client;
 }
 
-// --- Calendar helpers ---
-
 // getFreeBusy: returns array of { time: ISOString } for 30-min slots between 09:00-18:00 local
 export async function getFreeBusy(date, tzOffset = "+05:30") {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
 
-  // Day boundaries (9 AM – 6 PM)
   const start = new Date(date + "T09:00:00" + tzOffset);
   const end = new Date(date + "T18:00:00" + tzOffset);
 
@@ -167,7 +158,7 @@ export async function getFreeBusy(date, tzOffset = "+05:30") {
   const evening = slotList.filter((s) => s.hour >= 15 && s.hour < 18);
 
   return {
-    date, // "2025-12-10"
+    date,
     readableDate: new Date(date).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -198,10 +189,10 @@ export async function createEvent({ name, email, phone, start }) {
   const calendar = google.calendar({ version: "v3", auth });
 
   const startDt = new Date(start);
-  const endDt = new Date(startDt.getTime() + 30 * 60000); // 30 mins slot
+  const endDt = new Date(startDt.getTime() + 30 * 60000);
 
   const eventBody = {
-    summary: `CliniQ Assist – Appointment for ${name}`, // Clean subject
+    summary: `CliniQ Assist – Appointment for ${name}`,
     description: `
 Patient Name: ${name}
 Email: ${email}
@@ -255,7 +246,7 @@ export async function listEvents(email) {
   const now = new Date().toISOString();
   const res = await calendar.events.list({
     calendarId: "primary",
-    q: email, // quick text query — works if email present in description/attendees
+    q: email,
     singleEvents: true,
     orderBy: "startTime",
     timeMin: now,
@@ -263,7 +254,7 @@ export async function listEvents(email) {
   });
 
   const items = res.data.items || [];
-  // Map to compact objects - prefer start.dateTime or start.date
+
   return items.map((it) => ({
     id: it.id,
     summary: it.summary,
@@ -271,7 +262,7 @@ export async function listEvents(email) {
   }));
 }
 
-// update (reschedule) event - set new start (ISO string)
+// update (reschedule) event
 export async function updateEvent(eventId, newStart) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
@@ -306,10 +297,6 @@ export async function deleteEvent(eventId) {
   return { success: true };
 }
 
-// ----------------------
-// OTP (Email) helpers
-// ----------------------
-
 // create transport (Gmail) - uses app password
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -321,8 +308,8 @@ const transporter = nodemailer.createTransport({
 
 // store OTP in Supabase table 'otp_store' with primary key email
 export async function sendOTP(email) {
-  const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit
-  const ttl = Date.now() + 5 * 60 * 1000; // expire in 5 minutes
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  const ttl = Date.now() + 5 * 60 * 1000;
 
   const row = { email: email, otp: otp.toString(), expires_at: ttl };
   const { error } = await supabase
@@ -358,7 +345,6 @@ export async function verifyOTP(email, enteredOtp) {
   return data.otp === String(enteredOtp);
 }
 
-// exported for index.js
 export default {
   startAuth,
   handleCallback,

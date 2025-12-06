@@ -1,5 +1,0 @@
-after i scheduled the date and time it stops and shows restart 
-and log shows like this 
-
-Logs
-Contexthandler : Data type of the argument of the function 'get' did not match the required data type of '[BIGINT]' at line number 101
