@@ -1,21 +1,30 @@
-import twilio from "twilio";
+import axios from "axios";
 
 export const otpStore = {};
-
-const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
 
 export async function sendOTP(phone) {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   otpStore[phone] = otp;
 
-  await client.messages.create({
-    from: process.env.TWILIO_PHONE,
-    to: phone,
-    body: `Your CliniQ Assist verification code is: ${otp}`,
-  });
+  const message = `Your CliniQ Assist verification code is: ${otp}`;
 
-  return true;
+  try {
+    await axios.get("https://www.fast2sms.com/dev/bulkV2", {
+      params: {
+        authorization: process.env.FAST2SMS_API_KEY,
+        route: "q",
+        message,
+        numbers: phone,
+        flash: "0",
+      },
+    });
+
+    return true;
+  } catch (err) {
+    console.error("Fast2SMS Error:", err?.response?.data || err);
+    return false;
+  }
 }
 
 export async function verifyOTP(phone, otp) {
