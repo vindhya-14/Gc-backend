@@ -16,7 +16,7 @@ const {
 } = googleMod;
 
 // Import OTP + Email helpers
-import { sendOTP, verifyOTP } from "./otp";
+import { sendOTP, verifyOTP } from "./otp.js";
 import { sendConfirmationEmail } from "./sendEmail.js";
 
 // Read JSON body helper
