@@ -3,7 +3,7 @@ import Razorpay from "razorpay";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Import Google Calendar functions
+// Google Calendar module
 import googleMod from "./google.js";
 const {
   startAuth,
@@ -15,11 +15,11 @@ const {
   deleteEvent,
 } = googleMod;
 
-// Import OTP + Email helpers
+// Phone OTP + Email
 import { sendOTP, verifyOTP } from "./otp.js";
 import { sendConfirmationEmail } from "./sendEmail.js";
 
-// Read JSON body helper
+// Helper: read JSON body
 async function readBody(req) {
   let body = "";
   for await (const chunk of req) body += chunk;
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     OAUTH AUTH FLOW
+     GOOGLE OAUTH START
     ********************************************/
     if (pathname === "/auth" && req.method === "GET") {
       const url = startAuth();
@@ -60,25 +60,30 @@ export default async function handler(req, res) {
       return;
     }
 
+    /********************************************
+     GOOGLE OAUTH CALLBACK
+    ********************************************/
     if (pathname === "/oauth/callback" && req.method === "GET") {
-      const urlObj = new URL(req.url, `https://${req.headers.host}`);
-      const code = urlObj.searchParams.get("code");
+      const redirectUrl = new URL(req.url, `https://${req.headers.host}`);
+      const code = redirectUrl.searchParams.get("code");
 
       if (!code) {
         res.statusCode = 400;
-        res.end("Missing code");
+        res.end("Missing Google OAuth code");
         return;
       }
 
       await handleCallback(code);
 
       res.setHeader("Content-Type", "text/html");
-      res.end("<h3>Authentication Successful! You may close this window.</h3>");
+      res.end(
+        "<h3>Google Authentication Successful! You can close this window.</h3>"
+      );
       return;
     }
 
     /********************************************
-     FETCH AVAILABLE SLOTS
+     GET AVAILABLE SLOTS
     ********************************************/
     if (pathname === "/slots" && req.method === "POST") {
       const { date } = await readBody(req);
@@ -97,14 +102,14 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     CREATE GOOGLE CALENDAR EVENT
+     CREATE APPOINTMENT (GOOGLE CALENDAR)
     ********************************************/
     if (pathname === "/create" && req.method === "POST") {
       const { name, email, phone, start } = await readBody(req);
 
       if (!name || !email || !start) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing fields" }));
+        res.end(JSON.stringify({ error: "Missing required fields" }));
         return;
       }
 
@@ -116,7 +121,7 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     LIST EVENTS
+     LIST APPOINTMENTS (EMAIL)
     ********************************************/
     if (pathname === "/list" && req.method === "POST") {
       const { email } = await readBody(req);
@@ -135,14 +140,14 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     UPDATE EVENT
+     UPDATE EVENT (RESCHEDULE)
     ********************************************/
     if (pathname === "/update" && req.method === "POST") {
       const { eventId, start } = await readBody(req);
 
       if (!eventId || !start) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing fields" }));
+        res.end(JSON.stringify({ error: "Missing eventId or start" }));
         return;
       }
 
@@ -154,7 +159,7 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     DELETE EVENT
+     DELETE EVENT (CANCEL)
     ********************************************/
     if (pathname === "/delete" && req.method === "POST") {
       const { eventId } = await readBody(req);
@@ -180,12 +185,13 @@ export default async function handler(req, res) {
 
       if (!phone) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing phone number" }));
+        res.end(JSON.stringify({ error: "Missing phone" }));
         return;
       }
 
       try {
         await sendOTP(phone);
+
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ success: true }));
       } catch (err) {
@@ -204,16 +210,17 @@ export default async function handler(req, res) {
 
       if (!phone || !otp) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing fields" }));
+        res.end(JSON.stringify({ error: "Missing phone or otp" }));
         return;
       }
 
       try {
-        const ok = await verifyOTP(phone, otp);
+        const valid = await verifyOTP(phone, otp);
+
         res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ valid: ok }));
+        res.end(JSON.stringify({ valid }));
       } catch (err) {
-        console.error("Verify OTP Error:", err);
+        console.error("OTP Verify Error:", err);
         res.statusCode = 500;
         res.end(JSON.stringify({ error: "OTP verification failed" }));
       }
@@ -221,7 +228,7 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     PAYMENT LINK (RAZORPAY)
+     CREATE PAYMENT LINK (RAZORPAY)
     ********************************************/
     if (pathname === "/create-payment-link" && req.method === "POST") {
       const { name, email, phone, amount, start } = await readBody(req);
@@ -239,7 +246,7 @@ export default async function handler(req, res) {
           customer: { name, email, contact: phone },
           description: "Appointment Payment",
           notes: { name, email, phone, start },
-          callback_url: "https://" + req.headers.host + "/payment-webhook",
+          callback_url: `https://${req.headers.host}/payment-webhook`,
           callback_method: "get",
         });
 
@@ -254,7 +261,7 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     PAYMENT WEBHOOK → CONFIRM APPOINTMENT
+     PAYMENT WEBHOOK → CREATE EVENT + SEND EMAIL
     ********************************************/
     if (pathname === "/payment-webhook" && req.method === "GET") {
       const urlObj = new URL(req.url, `https://${req.headers.host}`);
@@ -262,12 +269,14 @@ export default async function handler(req, res) {
       const payment_id = urlObj.searchParams.get("razorpay_payment_id");
       const link_id = urlObj.searchParams.get("razorpay_payment_link_id");
 
+      // Razorpay returns empty requests while verifying link
       if (!payment_id || !link_id) {
         res.statusCode = 200;
         res.end("OK");
         return;
       }
 
+      // Fetch payment details
       const payment = await razor.payments.fetch(payment_id);
       const notes = payment.notes;
 
@@ -276,9 +285,10 @@ export default async function handler(req, res) {
       const phone = notes.phone;
       const start = notes.start;
 
+      // Create Google Calendar event
       const evt = await createEvent({ name, email, phone, start });
 
-      // Send confirmation email to patient
+      // Email confirmation
       await sendConfirmationEmail({
         to: email,
         name,
@@ -286,8 +296,9 @@ export default async function handler(req, res) {
         date: start,
       });
 
+      // Redirect to thank-you page
       res.writeHead(302, {
-        Location: "https://" + req.headers.host + "/thank-you",
+        Location: `https://${req.headers.host}/thank-you`,
       });
       res.end();
       return;
@@ -299,7 +310,7 @@ export default async function handler(req, res) {
     res.statusCode = 404;
     res.end("Not Found");
   } catch (err) {
-    console.error("Handler error:", err);
+    console.error("Handler Internal Error:", err);
     res.statusCode = 500;
     res.end("Server Error");
   }
