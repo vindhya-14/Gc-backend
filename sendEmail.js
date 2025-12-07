@@ -1,12 +1,11 @@
 import nodemailer from "nodemailer";
 
 export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_FROM,
-      pass: process.env.EMAIL_PASS,
-    },
+  await transporter.sendMail({
+    from: `CliniQ Assist <${process.env.EMAIL_FROM}>`,
+    to: to,
+    subject: "Your Appointment is Confirmed ✔",
+    html: htmlTemplate,
   });
 
   const html = `
