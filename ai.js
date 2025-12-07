@@ -7,61 +7,43 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function symptomCheck(symptoms) {
   const prompt = `
-You are a highly advanced medical triage assistant. You MUST analyze the user's symptoms deeply and return a STRICT JSON OBJECT with NO extra commentary.
-
-OUTPUT FORMAT (MANDATORY):
+You are a medical triage assistant. Analyze the user's symptoms and return ONLY a STRICT JSON:
 
 {
   "department": "",
   "severity": "",
   "possible_conditions": [],
   "recommended_action": "",
-  "follow_up_advice": ""
+  "followup_suggestion": ""
 }
 
-### ANALYSIS RULES
+Rules:
+- Output only JSON
+- No quotes outside JSON
+- No descriptions or explanations
 
-1. **Department Routing (very important)**  
-   Choose accurately based on symptoms:  
-   - Chest pain, breathlessness → "Cardiology"  
-   - Fever, cold, body pain → "General Medicine"  
-   - Skin rash, itching → "Dermatology"  
-   - Stomach pain, digestion issues → "Gastroenterology"  
-   - Anxiety, panic, sleep issues → "Psychiatry"  
-   - Child-related → "Pediatrics"  
-   - Women reproductive → "Gynecology"  
-   - Ear/nose/throat → "ENT"  
-   - Bone, joint issues → "Orthopedics"  
+Now analyze:
+"${symptoms}"
 
-2. **Severity Levels (choose one):**  
-   - "Mild" → Not urgent  
-   - "Moderate" → Should consult soon  
-   - "Severe" → Needs immediate medical attention  
+DEPARTMENT RULES:
+- Heart-related → "Cardiology"
+- Chest pain / breathlessness → "Cardiology"
+- Women symptoms → "Gynecology"
+- Child symptoms → "Pediatrics"
+- Skin → "Dermatology"
+- Bones → "Orthopedics"
+- Fever, headache, cold, viral → "General Medicine"
+- Stress, anxiety → "Psychiatry"
+- Eye issues → "Ophthalmology"
 
-3. **Possible Conditions:**  
-   Provide **3–6 highly likely medical conditions** based ONLY on symptoms.
-
-4. **Recommended Action:**  
-   Clear next step:  
-   - Whether to do rest, hydration, medication  
-   - Or to consult a specialist  
-   - Or seek emergency care  
-
-5. **Follow-up Advice (dynamic):**  
-   - If severity = Severe → ask user to seek urgent care  
-   - If cardiac → recommend ECG, visit cardiology  
-   - If skin → simple home remedies + dermatologist  
-   - If general → hydration, paracetamol, rest  
-   - If anxiety → grounding techniques + therapy  
-
-### IMPORTANT RULES  
-- STRICT JSON ONLY  
-- NO markdown  
-- NO explanations  
-- NO extra words  
-- NO line breaks outside JSON  
-
-Symptoms Provided: ${symptoms}
+FOLLOWUP SUGGESTION RULES:
+- If Cardiology → "You should consult a cardiologist as soon as possible."
+- If General Medicine → "A general physician can evaluate and guide you further."
+- If Dermatology → "A dermatologist can help diagnose the skin issue."
+- If Gynecology → "A gynecologist consultation is recommended."
+- If ENT → "Meeting an ENT specialist is advisable."
+- If Orthopedics → "You may need to see an orthopedic doctor."
+- Default → "Please consult a qualified doctor for a detailed check-up."
 `;
 
   const completion = await groq.chat.completions.create({
