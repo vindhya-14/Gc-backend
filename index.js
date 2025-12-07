@@ -19,6 +19,8 @@ const {
 import { sendOTP, verifyOTP } from "./otp.js";
 import { sendConfirmationEmail } from "./sendEmail.js";
 
+import { symptomCheck } from "./ai.js";
+
 // Helper: read JSON body
 async function readBody(req) {
   let body = "";
@@ -301,6 +303,31 @@ export default async function handler(req, res) {
         Location: `https://${req.headers.host}/thank-you`,
       });
       res.end();
+      return;
+    }
+
+    /********************************************
+ AI SYMPTOM CHECKER (GEMINI)
+********************************************/
+    if (pathname === "/ai/symptom-check" && req.method === "POST") {
+      const { symptoms } = await readBody(req);
+
+      if (!symptoms) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing symptoms" }));
+        return;
+      }
+
+      try {
+        const ai = await symptomCheck(symptoms);
+
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ result: ai }));
+      } catch (err) {
+        console.error("AI Error:", err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: "AI processing failed" }));
+      }
       return;
     }
 
