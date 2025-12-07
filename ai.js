@@ -18,17 +18,17 @@ You are a medical triage assistant. Analyze the user's symptoms and return ONLY 
 
 Symptoms provided: ${symptoms}
 
-Make sure:
-- No explanations
+Rules:
 - No extra text
 - No markdown
-- Only pure JSON
+- No explanations
+- Only pure JSON output
 `;
 
   const completion = await groq.chat.completions.create({
-    model: "llama3-8b-8192", // FREE + Recommended
+    model: "llama-3.1-8b-instant", // ✅ Updated model
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.3,
+    temperature: 0.2,
   });
 
   return completion.choices[0].message.content;
