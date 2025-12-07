@@ -1,17 +1,17 @@
 export async function symptomCheck(symptoms) {
   const prompt = `
-You are a clinical-grade medical triage assistant. Your response must be highly accurate, medically safe, and ALWAYS returned as a STRICT JSON object.
-There must be *no* additional text, no markdown, no commentary — ONLY the JSON.
+You are a clinical-grade medical triage assistant. Your response must be highly accurate and ALWAYS returned as a STRICT JSON object.
+No markdown, no explanations — ONLY the JSON below.
 
 ===================================
- USER SYMPTOMS
+USER SYMPTOMS
 ===================================
 "${symptoms}"
 
 ===================================
- REQUIRED JSON OUTPUT
+REQUIRED JSON OUTPUT
 ===================================
-Return ONLY this JSON structure:
+Return ONLY this structure:
 
 {
   "department": "",
@@ -19,10 +19,11 @@ Return ONLY this JSON structure:
   "severity": "",
   "possible_conditions": [],
   "recommended_action": "",
-  "followup_suggestion": ""
+  "followup_suggestion": "",
+  "general_health_tips": []
 }
 
-If ANY field is missing, unclear, or cannot be inferred, you MUST substitute a medically safe default value:
+If ANY field is unclear → use these SAFE DEFAULTS:
 
 {
   "department": "General Medicine",
@@ -30,93 +31,67 @@ If ANY field is missing, unclear, or cannot be inferred, you MUST substitute a m
   "severity": "Mild",
   "possible_conditions": ["General viral illness"],
   "recommended_action": "Monitor symptoms and stay hydrated.",
-  "followup_suggestion": "Consult a general physician if symptoms persist."
+  "followup_suggestion": "Consult a general physician if symptoms persist.",
+  "general_health_tips": [
+    "Stay hydrated and get adequate rest.",
+    "Avoid stress and heavy physical exertion.",
+    "Monitor symptoms regularly and seek help if they worsen."
+  ]
 }
 
 ===================================
- DEPARTMENT + DOCTOR CLASSIFICATION (STRICT RULES)
+DEPARTMENT MAPPING (STRICT)
 ===================================
-Use the following mappings with HIGH PRIORITY:
-
-1. **Cardiology (Red-Flag Priority)**
-   Symptoms: chest pain, left arm pain, breathlessness, palpitations, chest pressure
-   department: "Cardiology"
-   expected_doctor: "Cardiologist"
-
-2. **General Medicine**
-   Symptoms: fever, cold, cough, body pain, throat pain, mild viral symptoms
-   expected_doctor: "General Physician"
-
-3. **Dermatology**
-   Symptoms: rashes, itching, acne, eczema, fungal infection
-
-4. **Orthopedics**
-   Symptoms: joint pain, muscle pain, knee pain, fractures, back pain
-
-5. **Gynecology**
-   Symptoms: menstrual issues, cramps, pregnancy symptoms, vaginal issues
-
-6. **Neurology**
-   Symptoms: headache, migraine, dizziness, seizures, numbness, tingling
-
-7. **Ophthalmology**
-   Symptoms: red eyes, blurry vision, irritation, eye discharge
-
-8. **Psychiatry**
-   Symptoms: stress, anxiety, panic, depression, insomnia
-
-If the symptoms do not clearly match any category:
-department: "General Medicine"
-expected_doctor: "General Physician"
+• Chest pain, left arm pain, breathing issues, palpitations → Cardiology / Cardiologist  
+• Fever, cold, viral symptoms → General Medicine / General Physician  
+• Rashes, itching → Dermatology  
+• Joint/knee/back pain → Orthopedics  
+• Menstrual/pregnancy issues → Gynecology  
+• Headache, dizziness, seizures, numbness → Neurology  
+• Eye redness, irritation, vision issues → Ophthalmology  
+• Anxiety, stress, panic → Psychiatry  
+If not clear → General Medicine
 
 ===================================
- SEVERITY RULES (STRICT)
+SEVERITY RULES
 ===================================
-Severity MUST be one of: "Mild", "Moderate", "High".
+Severity MUST be Mild / Moderate / High.
 
-RED-FLAG SYMPTOMS → ALWAYS "High":
-- chest pain  
-- difficulty breathing  
-- fainting  
-- severe headache  
-- sudden vision loss  
-- seizures  
-- uncontrolled bleeding  
-- very high fever  
-- severe abdominal pain  
+RED-FLAG → ALWAYS "High":
+chest pain, breathing difficulty, fainting, severe headache, seizures, sudden vision loss, severe abdominal pain, uncontrolled bleeding.
 
 ===================================
- POSSIBLE CONDITIONS RULES
+POSSIBLE CONDITIONS
 ===================================
-Include 2–5 realistic, common conditions. No rare diseases.
+Return 2–5 realistic conditions.
 
 ===================================
- RECOMMENDED ACTION RULES
+RECOMMENDED ACTION
 ===================================
-Provide ONE clear actionable instruction, such as:
-- "Seek emergency cardiac evaluation."
-- "Consult a dermatologist within 24 hours."
-- "Monitor symptoms and take rest."
+One actionable instruction only.
 
 ===================================
- FOLLOW-UP SUGGESTION RULES
+FOLLOW-UP SUGGESTION
 ===================================
-Provide one practical advice step, e.g.:
-- "Avoid physical exertion."
-- "Increase fluids."
-- "Visit a specialist if symptoms persist."
+Provide one clear next-step.
 
 ===================================
- SAFETY GUARANTEE
+GENERAL HEALTH TIPS
 ===================================
-If the model is uncertain OR classification is unclear → return the SAFE DEFAULT JSON exactly as defined.
+Always include these 3 universal health tips:
+[
+  "Stay hydrated and get adequate rest.",
+  "Avoid stress and heavy physical exertion.",
+  "Monitor symptoms and seek help if they worsen."
+]
 
 ===================================
- FINAL INSTRUCTION
+FINAL INSTRUCTION
 ===================================
-Think internally, but output ONLY the final JSON — no explanation, no formatting, no commentary.
-  `;
+Think internally, but output ONLY the JSON.
+`;
 
+  // Call Groq API
   const completion = await groq.chat.completions.create({
     model: "llama-3.1-8b-instant",
     messages: [{ role: "user", content: prompt }],
@@ -126,30 +101,50 @@ Think internally, but output ONLY the final JSON — no explanation, no formatti
   let result = completion.choices[0].message.content;
 
   /*********************************************
-   OPTIONAL: Backend Safety Override (Recommended)
+   OPTIONAL SAFETY OVERRIDE (HIGHLY RECOMMENDED)
    Ensures chest pain NEVER goes to General Medicine
   *********************************************/
   try {
     const parsed = JSON.parse(result);
     const lower = symptoms.toLowerCase();
 
-    if (
-      lower.includes("chest pain") ||
-      lower.includes("left arm pain") ||
-      lower.includes("breath") ||
-      lower.includes("palpit") ||
-      lower.includes("pressure")
-    ) {
+    const redFlags = [
+      "chest pain",
+      "left arm pain",
+      "breath",
+      "difficulty breathing",
+      "palpit",
+      "pressure",
+      "severe headache",
+      "fainting",
+      "seizure",
+      "vision loss",
+      "severe abdominal",
+      "bleeding",
+    ];
+
+    const hasRedFlag = redFlags.some((flag) => lower.includes(flag));
+
+    if (hasRedFlag) {
       parsed.department = "Cardiology";
       parsed.expected_doctor = "Cardiologist";
       parsed.severity = "High";
-      parsed.recommended_action = "Seek urgent cardiac evaluation.";
+      parsed.recommended_action =
+        "Seek immediate emergency medical evaluation.";
       parsed.followup_suggestion =
-        "Visit a cardiologist or emergency department immediately.";
-      result = JSON.stringify(parsed);
+        "Visit a cardiologist or emergency department right away.";
     }
+
+    // ADD GENERAL HEALTH TIPS ALWAYS (even if AI misses it)
+    parsed.general_health_tips = [
+      "Stay hydrated and get adequate rest.",
+      "Avoid stress and heavy physical exertion.",
+      "Monitor symptoms regularly and seek help if they worsen.",
+    ];
+
+    result = JSON.stringify(parsed);
   } catch (e) {
-    // If parsing fails, send safe default
+    // Fallback JSON if AI output breaks
     result = JSON.stringify({
       department: "General Medicine",
       expected_doctor: "General Physician",
@@ -157,6 +152,11 @@ Think internally, but output ONLY the final JSON — no explanation, no formatti
       possible_conditions: ["General viral illness"],
       recommended_action: "Monitor symptoms and stay hydrated.",
       followup_suggestion: "Consult a general physician if symptoms persist.",
+      general_health_tips: [
+        "Stay hydrated and get adequate rest.",
+        "Avoid stress and heavy physical exertion.",
+        "Monitor symptoms regularly and seek help if they worsen.",
+      ],
     });
   }
 
