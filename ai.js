@@ -1,14 +1,13 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function symptomCheck(symptoms) {
   const prompt = `
-You are a medical triage assistant. analyze symptoms and return a STRICT JSON:
+You are a medical triage assistant. Analyze the user's symptoms and return ONLY a STRICT JSON object:
 
 {
   "department": "",
@@ -17,9 +16,20 @@ You are a medical triage assistant. analyze symptoms and return a STRICT JSON:
   "recommended_action": ""
 }
 
-Symptoms: ${symptoms}
+Symptoms provided: ${symptoms}
+
+Make sure:
+- No explanations
+- No extra text
+- No markdown
+- Only pure JSON
 `;
 
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  const completion = await groq.chat.completions.create({
+    model: "llama3-8b-8192", // FREE + Recommended
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.3,
+  });
+
+  return completion.choices[0].message.content;
 }
