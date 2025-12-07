@@ -190,15 +190,18 @@ export async function createEvent({ name, email, phone, start }) {
   const calendar = google.calendar({ version: "v3", auth });
 
   const startDt = new Date(start);
-  const endDt = new Date(startDt.getTime() + 30 * 60000);
+  const endDt = new Date(startDt.getTime() + 30 * 60000); // 30 mins
 
   const eventBody = {
     summary: `CliniQ Assist – Appointment for ${name}`,
     description: `Patient Name: ${name}\nEmail: ${email}\nPhone: ${phone}`,
+
     start: { dateTime: startDt.toISOString(), timeZone: "Asia/Kolkata" },
     end: { dateTime: endDt.toISOString(), timeZone: "Asia/Kolkata" },
 
-    attendees: [{ email, displayName: name }],
+    // ❌ REMOVE attendees → removes Google invitation email
+    // attendees: [{ email, displayName: name }],
+
     organizer: {
       email: "vindhya353@gmail.com",
       displayName: "CliniQ Assist",
@@ -213,7 +216,10 @@ export async function createEvent({ name, email, phone, start }) {
 
   const created = await calendar.events.insert({
     calendarId: "primary",
-    sendUpdates: "all",
+
+    // ❗ MOST IMPORTANT — prevents Google sending ANY email
+    sendUpdates: "none",
+
     requestBody: eventBody,
   });
 
