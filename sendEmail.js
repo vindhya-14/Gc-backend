@@ -1,13 +1,21 @@
 import nodemailer from "nodemailer";
 
-export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
-  await transporter.sendMail({
-    from: `CliniQ Assist <${process.env.EMAIL_FROM}>`,
-    to: to,
-    subject: "Your Appointment is Confirmed ✔",
-    html: htmlTemplate,
-  });
+// -----------------------------------------
+// CREATE TRANSPORTER (must be defined here)
+// -----------------------------------------
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_FROM, // example: cliniqassist@gmail.com
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
+// -----------------------------------------
+// SEND CONFIRMATION EMAIL
+// -----------------------------------------
+export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
+  // Build email HTML
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 16px; color: #333;">
       <h2 style="color: #2E7D32;">Appointment Confirmed ✔</h2>
@@ -29,10 +37,13 @@ export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
     </div>
   `;
 
+  // -----------------------------------------
+  // SEND EMAIL
+  // -----------------------------------------
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+    from: `CliniQ Assist <${process.env.EMAIL_FROM}>`, // sender name
     to,
-    subject: "Your Appointment is Confirmed – CliniQ Assist",
+    subject: "Your Appointment is Confirmed – CliniQ Assist ✔",
     html,
   });
 }
