@@ -1,459 +1,606 @@
 response = Map();
 response.put("action","context");
-response.put("context_id",context_id);
+response.put("context_id", context_id);
+
 base_url = "https://google-calendar-two.vercel.app";
 
+info "BOOK_APPT :: answers = " + answers;
 
-
-//BOOK APPOINTMENT
-
-if(context_id == "book_appt")
+// booking flow
+if (context_id == "book_appt")
 {
-	
-	if(answers.containsKey("dept") && !answers.containsKey("name"))
-	{
-		q = Map();
-		q.put("name","name");
-		q.put("replies",{"May I know your full name, please?"});
-		qs = List();
-		qs.add(q);
-		response.put("questions",qs);
-		return response;
-	}
-	
-	if(answers.containsKey("name") && !answers.containsKey("email"))
-	{
-		q = Map();
-		q.put("name","email");
-		q.put("replies",{"Great! Please share your email address. We’ll send you a quick OTP for verification."});
-		v = Map();
-		v.put("format","email");
-		v.put("error","Please enter a valid email address.");
-		q.put("validate",v);
-		qs = List();
-		qs.add(q);
-		response.put("questions",qs);
-		return response;
-	}
-	
-	if(answers.containsKey("email") && !answers.containsKey("email_otp"))
-	{
-		visitor_email = answers.get("email").get("text");
-		payload = Map();
-		payload.put("email",visitor_email);
-		invokeurl
-		[
-			url :base_url + "/send-otp"
-			type :POST
-			body:payload.toString()
-		]
-		q = Map();
-		q.put("name","email_otp");
-		q.put("replies",{"I've sent a 6-digit OTP to your email. Kindly enter it below to continue."});
-		qs = List();
-		qs.add(q);
-		response.put("questions",qs);
-		return response;
-	}
-	
-	if(answers.containsKey("email_otp") && !answers.containsKey("phone"))
-	{
-		visitor_email = answers.get("email").get("text");
-		otp = answers.get("email_otp").get("text");
-		payload = Map();
-		payload.put("email",visitor_email);
-		payload.put("otp",otp);
-		verify = invokeurl
-		[
-			url :base_url + "/verify-otp"
-			type :POST
-			body:payload.toString()
-		];
-		if(verify.get("valid") == true)
-		{
-			q = Map();
-			q.put("name","phone");
-			q.put("replies",{" OTP verified successfully!\nCould you share your phone number?"});
-			v = Map();
-			v.put("format","phoneno");
-			v.put("error","Please enter a valid phone number.");
-			q.put("validate",v);
-			qs = List();
-			qs.add(q);
-			response.put("questions",qs);
-			return response;
-		}
-		else
-		{
-			response.put("action","reply");
-			response.put("replies",{" The OTP doesn't match. Please try again."});
-			return response;
-		}
-	}
+    // ask name
+    if (!answers.containsKey("name"))
+    {
+        q = {"name":"name","replies":{"👤 May I know your full name?"}};
+        response.put("questions",{q});
+        return response;
+    }
 
-	
-	if(answers.containsKey("phone") && !answers.containsKey("date"))
-	{
-		q = Map();
-		q.put("name","date");
-		q.put("replies",{"Please choose your preferred appointment date."});
-		inp = Map();
-		inp.put("type","calendar");
-		q.put("input",inp);
-		qs = List();
-		qs.add(q);
-		response.put("questions",qs);
-		return response;
-	}
+    // ask email
+    if (!answers.containsKey("email"))
+    {
+        q = Map();
+        q.put("name","email");
+        q.put("replies",{"📧 Please enter your email."});
 
-	
-	if(answers.containsKey("date") && !answers.containsKey("slot"))
-	{
-		raw = answers.get("date").get("text");
-		only = raw.substring(0,raw.indexOf(" "));
-		dt = only.toDate("dd-MMM-yyyy");
-		fixed_date = dt.toString("yyyy-MM-dd");
-		
-		payload = {"date":fixed_date};
-		slotResp = invokeurl
-		[
-			url :base_url + "/slots"
-			type :POST
-			body:payload.toString()
-		];
-		opts = List();
-		
-		if(slotResp.containsKey("morning"))
-		{
-			for each  s in slotResp.get("morning")
-			{
-				opts.add("🌅 Morning - " + s.get("time") + " | " + s.get("value"));
-			}
-		}
-		
-		if(slotResp.containsKey("afternoon"))
-		{
-			for each  s in slotResp.get("afternoon")
-			{
-				opts.add("🌞 Afternoon - " + s.get("time") + " | " + s.get("value"));
-			}
-		}
-		
-		if(slotResp.containsKey("evening"))
-		{
-			for each  s in slotResp.get("evening")
-			{
-				opts.add("🌆 Evening - " + s.get("time") + " | " + s.get("value"));
-			}
-		}
-		if(opts.size() == 0)
-		{
-			response.put("action","reply");
-			response.put("replies",{" All slots are booked for this date."});
-			return response;
-		}
-		q = Map();
-		q.put("name","slot");
-		q.put("replies",{"🗓 *Available Slots for " + slotResp.get("readableDate") + "*","Please choose your preferred time:"});
-		inp = {"type":"select","options":opts};
-		q.put("input",inp);
-		response.put("questions",{q});
-		return response;
-	}
-	// STEP 7 – Create Event & Payment Link
-	if(answers.containsKey("slot") && !answers.containsKey("pay_link_sent"))
-	{
-		name = answers.get("name").get("text");
-		email = answers.get("email").get("text");
-		phone = answers.get("phone").get("text");
-		
-		raw_slot = answers.get("slot").get("text");
-		start = raw_slot.substring(raw_slot.indexOf(" | ") + 3,raw_slot.length());
-		
-		payload = Map();
-		payload.put("name",name);
-		payload.put("email",email);
-		payload.put("phone",phone);
-		payload.put("start",start);
-		payload.put("amount",499);
-		// Call payment link API
-		payResp = invokeurl
-		[
-			url :base_url + "/create-payment-link"
-			type :POST
-			body:payload.toString()
-		];
-		if(payResp.containsKey("pay_url"))
-		{
-			pay_link = payResp.get("pay_url");
-			q = Map();
-			q.put("name","pay_link_sent");
-			q.put("replies",{"💳 You're almost done!","Please complete your booking using the secure payment link below:",pay_link,"Once the payment is successful, your appointment will be confirmed automatically."});
-			response.put("questions",{q});
-			return response;
-		}
-		else
-		{
-			response.put("action","reply");
-			response.put("replies",{" Payment link could not be generated. Please try again."});
-			return response;
-		}
-	}
+        v = {"format":"email","error":"❌ Please enter a valid email."};
+        q.put("validate", v);
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // ask phone
+    if (!answers.containsKey("phone"))
+    {
+        q = Map();
+        q.put("name","phone");
+        q.put("replies",{"📱 Please enter your mobile number."});
+
+        v = {"format":"phoneno","error":"❌ Invalid mobile number."};
+        q.put("validate", v);
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // send OTP
+    if (answers.containsKey("phone") && !answers.containsKey("phone_otp"))
+    {
+        phone = answers.get("phone").get("text");
+
+        payload = {"phone":phone};
+
+        invokeurl
+        [
+            url : base_url + "/send-otp"
+            type : POST
+            body : payload.toString()
+        ];
+
+        q = Map();
+        q.put("name","phone_otp");
+        q.put("replies",{
+            "📩 OTP sent to **" + phone + "**.",
+            "Please enter the 6-digit code."
+        });
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // verify OTP
+    if (answers.containsKey("phone_otp") && !answers.containsKey("otp_verified"))
+    {
+        phone = answers.get("phone").get("text");
+        otp = answers.get("phone_otp").get("text");
+
+        payload = {"phone":phone, "otp":otp};
+
+        verifyResp = invokeurl
+        [
+            url : base_url + "/verify-otp"
+            type : POST
+            body : payload.toString()
+        ];
+
+        if (verifyResp.containsKey("valid") && verifyResp.get("valid") == true)
+        {
+            q = Map();
+            q.put("name","otp_verified");
+            q.put("replies",{
+                "✅ Number verified!",
+                "Tap Continue to pick your date."
+            });
+
+            inp = {"type":"select","options":{"Continue"}};
+            q.put("input", inp);
+
+            response.put("questions",{q});
+            return response;
+        }
+        else
+        {
+            response.put("action","reply");
+            response.put("replies",{"❌ Wrong OTP. Try again."});
+            return response;
+        }
+    }
+
+    // ask date
+    if (answers.containsKey("otp_verified") && !answers.containsKey("date"))
+    {
+        q = Map();
+        q.put("name","date");
+        q.put("replies",{"📅 Please choose your appointment date."});
+        q.put("input",{"type":"calendar"});
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // fetch time slots
+    if (answers.containsKey("date") && !answers.containsKey("slot"))
+    {
+        raw = answers.get("date").get("text");
+        only = raw.substring(0, raw.indexOf(" "));
+        dt = only.toDate("dd-MMM-yyyy");
+        dateFinal = dt.toString("yyyy-MM-dd");
+
+        payload = {"date":dateFinal};
+        slotResp = invokeurl
+        [
+            url : base_url + "/slots"
+            type : POST
+            body : payload.toString()
+        ];
+
+        opts = List();
+
+        // morning slots
+        if(slotResp.containsKey("morning"))
+        {
+            for each s in slotResp.get("morning")
+            {
+                opts.add("🌅 Morning • " + s.get("time") + " | " + s.get("value"));
+            }
+        }
+
+        // afternoon slots
+        if(slotResp.containsKey("afternoon"))
+        {
+            for each s in slotResp.get("afternoon")
+            {
+                opts.add("🌞 Afternoon • " + s.get("time") + " | " + s.get("value"));
+            }
+        }
+
+        // evening slots
+        if(slotResp.containsKey("evening"))
+        {
+            for each s in slotResp.get("evening")
+            {
+                opts.add("🌆 Evening • " + s.get("time") + " | " + s.get("value"));
+            }
+        }
+
+        if (opts.isEmpty())
+        {
+            response.put("action","reply");
+            response.put("replies",{"❌ No slots available for this date."});
+            return response;
+        }
+
+        q = Map();
+        q.put("name","slot");
+        q.put("replies",{
+            "🗓 Available slots for **" + slotResp.get("readableDate") + "**",
+            "Please choose your time:"
+        });
+
+        q.put("input",{"type":"select","options":opts});
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // create payment link
+    if (answers.containsKey("slot") && !answers.containsKey("pay_link_sent"))
+    {
+        name = answers.get("name").get("text");
+        email = answers.get("email").get("text");
+        phone = answers.get("phone").get("text");
+
+        slotRaw = answers.get("slot").get("text");
+        start = slotRaw.substring(slotRaw.indexOf(" | ") + 3);
+
+        payload = {
+            "name":name,
+            "email":email,
+            "phone":phone,
+            "start":start,
+            "amount":499
+        };
+
+        payResp = invokeurl
+        [
+            url : base_url + "/create-payment-link"
+            type : POST
+            body : payload.toString()
+        ];
+
+        if (payResp.containsKey("pay_url"))
+        {
+            link = payResp.get("pay_url");
+
+            q = Map();
+            q.put("name","pay_link_sent");
+            q.put("replies",{
+                "💳 Almost done!",
+                "Use the link below to complete your payment:",
+                link,
+                "Your appointment will be confirmed after payment."
+            });
+
+            response.put("questions",{q});
+            return response;
+        }
+        else
+        {
+            response.put("action","reply");
+            response.put("replies",{"❌ Could not generate payment link. Try again."});
+            return response;
+        }
+    }
 }
 
-
-// RESCHEDULE APPOINTMENT
-
-if(context_id == "reschedule_appt")
+// appointment management flow
+if(context_id == "my_appts")
 {
-	if(!answers.containsKey("email"))
-	{
-		q = Map();
-		q.put("name","email");
-		q.put("replies",{"🔄 Please enter the email you used while booking your appointment:"});
-		response.put("questions",{q});
-		return response;
-	}
-	if(!answers.containsKey("selected_event"))
-	{
-		mail = answers.get("email").get("text");
-		payload = {"email":mail};
-		items = invokeurl
-		[
-			url :base_url + "/list"
-			type :POST
-			body:payload.toString()
-		];
-		if(items.size() == 0)
-		{
-			response.put("action","end");
-			response.put("replies",{" No appointments found for this email."});
-			return response;
-		}
-		opts = List();
-		for each  a in items
-		{
-			start = a.get("start");
-			date = start.substring(0,10);
-			time = start.substring(11,16);
-			id = a.get("id");
-			opts.add(date + " at " + time);
-		}
-		q = Map();
-		q.put("name","selected_event");
-		q.put("replies",{"Select the appointment you want to reschedule:"});
-		q.put("input",{"type":"select","options":opts});
-		response.put("questions",{q});
-		return response;
-	}
-	if(!answers.containsKey("new_date"))
-	{
-		q = {"name":"new_date","replies":{"📅 Please choose the new appointment date:"},"input":{"type":"calendar"}};
-		response.put("questions",{q});
-		return response;
-	}
-	if(!answers.containsKey("new_slot"))
-	{
-		raw = answers.get("new_date").get("text");
-		only = raw.substring(0,raw.indexOf(" "));
-		dt = only.toDate("dd-MMM-yyyy");
-		fixed_date = dt.toString("yyyy-MM-dd");
-		payload = {"date":fixed_date};
-		slotResp = invokeurl
-		[
-			url :base_url + "/slots"
-			type :POST
-			body:payload.toString()
-		];
-		opts = List();
-		// Morning
-		if(slotResp.containsKey("morning"))
-		{
-			for each  s in slotResp.get("morning")
-			{
-				opts.add("🌅 Morning - " + s.get("time") + " | " + s.get("value"));
-			}
-		}
-		// Afternoon
-		if(slotResp.containsKey("afternoon"))
-		{
-			for each  s in slotResp.get("afternoon")
-			{
-				opts.add("🌞 Afternoon - " + s.get("time") + " | " + s.get("value"));
-			}
-		}
-		// Evening
-		if(slotResp.containsKey("evening"))
-		{
-			for each  s in slotResp.get("evening")
-			{
-				opts.add("🌆 Evening - " + s.get("time") + " | " + s.get("value"));
-			}
-		}
-		q = Map();
-		q.put("name","new_slot");
-		q.put("replies",{"⏰ Choose a new time slot:"});
-		q.put("input",{"type":"select","options":opts});
-		response.put("questions",{q});
-		return response;
-	}
-	// Extract ID & delete old event
-	selected = answers.get("selected_event").get("text");
-	old_id = selected.substring(selected.indexOf(" | ") + 3,selected.length());
-	payload_del = {"eventId":old_id};
-	invokeurl
-	[
-		url :base_url + "/delete"
-		type :POST
-		body:payload_del.toString()
-	]
-	// Extract ISO-only START for new slot
-	raw_slot = answers.get("new_slot").get("text");
-	new_start = raw_slot.substring(raw_slot.indexOf(" | ") + 3,raw_slot.length());
-	// Create new event
-	payload_new = {"name":"Rescheduled Appointment","email":answers.get("email").get("text"),"phone":"","start":new_start};
-	invokeurl
-	[
-		url :base_url + "/create"
-		type :POST
-		body:payload_new.toString()
-	]
-	response.put("action","end");
-	response.put("replies",{" Your appointment has been rescheduled successfully!"});
-	return response;
+    // ask email
+    if(!answers.containsKey("lookup"))
+    {
+        q = Map();
+        q.put("name","lookup");
+        q.put("replies",{"📧 Please enter your email:"});
+
+        v = {"format":"email","error":"❌ Invalid email."};
+        q.put("validate", v);
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // fetch user appointments
+    lookup = answers.get("lookup").get("text");
+    payload = {"email":lookup, "phone":lookup};
+
+    listResp = invokeurl
+    [
+        url : base_url + "/list"
+        type : POST
+        body : payload.toString()
+    ];
+
+    if(listResp.isEmpty())
+    {
+        response.put("action","end");
+        response.put("replies",{"❌ No appointments found for " + lookup});
+        return response;
+    }
+
+    // show list to user
+    if(!answers.containsKey("selected_appt"))
+    {
+        opts = List();
+
+        for each appt in listResp
+        {
+            dt = appt.get("start");
+            id = appt.get("id");
+
+            label = dt.substring(0,10) + " at " + dt.substring(11,16) + " | " + id;
+            opts.add(label);
+        }
+
+        q = Map();
+        q.put("name","selected_appt");
+        q.put("replies",{"📄 Your appointments:", "Choose one:"});
+        q.put("input",{"type":"select","options":opts});
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // ask user what they want to do
+    if(answers.containsKey("selected_appt") && !answers.containsKey("appt_action"))
+    {
+        selected = answers.get("selected_appt").get("text");
+        appt_id = selected.substring(selected.indexOf(" | ") + 3);
+
+        pre = {
+            {"name":"appt_id","value":appt_id},
+            {"name":"appt_label","value":selected}
+        };
+
+        response.put("precollect", pre);
+
+        q = Map();
+        q.put("name","appt_action");
+        q.put("replies",{
+            "📄 Selected appointment:",
+            selected,
+            "",
+            "Choose an option:"
+        });
+
+        q.put("input",{
+            "type":"select",
+            "options":{"Reschedule","Cancel","Back"}
+        });
+
+        response.put("questions",{q});
+        return response;
+    }
+
+    // cancel appointment
+    if(answers.containsKey("appt_action") && answers.get("appt_action").get("text") == "Cancel")
+    {
+        appt_id = "";
+        
+        if(answers.containsKey("appt_id"))
+            appt_id = answers.get("appt_id").get("text");
+        else if(answers.containsKey("selected_appt"))
+            appt_id = answers.get("selected_appt").get("text").substring(answers.get("selected_appt").get("text").indexOf(" | ") + 3);
+
+        if(appt_id == "")
+        {
+            response.put("action","reply");
+            response.put("replies",{"⚠️ Couldn't find appointment ID. Try again."});
+            return response;
+        }
+
+        delReq = {"eventId": appt_id};
+
+        invokeurl
+        [
+            url : base_url + "/delete"
+            type : POST
+            body : delReq.toString()
+        ];
+
+        response.put("action","end");
+        response.put("replies",{
+            "🗑️ Appointment cancelled.",
+            "You can book again anytime."
+        });
+
+        return response;
+    }
+
+    // go back
+    if(answers.containsKey("appt_action") && answers.get("appt_action").get("text") == "Back")
+    {
+        response.put("action","reply");
+        response.put("replies",{"Returning to menu..."});
+        response.put("suggestions",{"Booking Services","Manage My Appointments","Help & Tools"});
+        return response;
+    }
+
+    // start reschedule → ask phone
+    if(answers.containsKey("appt_action") && answers.get("appt_action").get("text") == "Reschedule" && !answers.containsKey("r_phone"))
+    {
+        q = {"name":"r_phone","replies":{"📱 Enter your phone number:"},"validate":{"format":"phoneno","error":"❌ Invalid phone"}};
+        response.put("questions",{q});
+        return response;
+    }
+
+    // send OTP for reschedule
+    if(answers.containsKey("r_phone") && !answers.containsKey("r_phone_otp"))
+    {
+        phone = answers.get("r_phone").get("text");
+
+        req = {"phone":phone};
+
+        invokeurl
+        [
+            url : base_url + "/send-otp"
+            type : POST
+            body : req.toString()
+        ];
+
+        q = {"name":"r_phone_otp","replies":{"📩 OTP sent to **" + phone + "**.","Enter OTP:"}};
+        response.put("questions",{q});
+        return response;
+    }
+
+    // verify OTP for reschedule
+    if(answers.containsKey("r_phone_otp") && !answers.containsKey("r_otp_verified"))
+    {
+        phone = answers.get("r_phone").get("text");
+        otp   = answers.get("r_phone_otp").get("text");
+
+        req = {"phone":phone,"otp":otp};
+
+        verify = invokeurl
+        [
+            url : base_url + "/verify-otp"
+            type : POST
+            body : req.toString()
+        ];
+
+        if(verify.get("valid") == true)
+        {
+            q = {
+                "name":"r_otp_verified",
+                "replies":{"✅ Phone verified!","Tap Continue to pick a new date."},
+                "input":{"type":"select","options":{"Continue"}}
+            };
+            response.put("questions",{q});
+            return response;
+        }
+        else
+        {
+            response.put("action","reply");
+            response.put("replies",{"❌ Wrong OTP. Try again."});
+            return response;
+        }
+    }
+
+    // ask new date
+    if(answers.containsKey("r_otp_verified") && !answers.containsKey("new_date"))
+    {
+        q = {"name":"new_date","replies":{"📅 Choose your new date:"},"input":{"type":"calendar"}};
+        response.put("questions",{q});
+        return response;
+    }
+
+    // ask new time
+    if(answers.containsKey("new_date") && !answers.containsKey("new_slot"))
+    {
+        raw = answers.get("new_date").get("text");
+        only = raw.substring(0, raw.indexOf(" "));
+        dt = only.toDate("dd-MMM-yyyy");
+        fixed = dt.toString("yyyy-MM-dd");
+
+        req = {"date":fixed};
+
+        slotResp = invokeurl
+        [
+            url : base_url + "/slots"
+            type : POST
+            body : req.toString()
+        ];
+
+        opts = List();
+
+        if(slotResp.containsKey("morning"))
+        {
+            for each s in slotResp.get("morning")
+                opts.add("🌅 " + s.get("time") + " | " + s.get("value"));
+        }
+
+        if(slotResp.containsKey("afternoon"))
+        {
+            for each s in slotResp.get("afternoon")
+                opts.add("🌞 " + s.get("time") + " | " + s.get("value"));
+        }
+
+        if(slotResp.containsKey("evening"))
+        {
+            for each s in slotResp.get("evening")
+                opts.add("🌆 " + s.get("time") + " | " + s.get("value"));
+        }
+
+        q = {"name":"new_slot","replies":{"⏰ Choose a new time slot:"},"input":{"type":"select","options":opts}};
+        response.put("questions",{q});
+        return response;
+    }
+
+    // update appointment
+    if(answers.containsKey("new_slot"))
+    {
+        appt_id = "";
+
+        if(answers.containsKey("appt_id"))
+            appt_id = answers.get("appt_id").get("text");
+        else if(answers.containsKey("selected_appt"))
+            appt_id = answers.get("selected_appt").get("text").substring(answers.get("selected_appt").get("text").indexOf(" | ") + 3);
+
+        if(appt_id == null || appt_id == "")
+        {
+            response.put("action","reply");
+            response.put("replies",{"⚠️ Appointment ID not found."});
+            return response;
+        }
+
+        raw_slot = answers.get("new_slot").get("text");
+
+        if(!raw_slot.contains(" | "))
+        {
+            response.put("action","reply");
+            response.put("replies",{"⚠️ Slot format incorrect."});
+            return response;
+        }
+
+        new_start = raw_slot.substring(raw_slot.indexOf(" | ") + 3);
+
+        req = {"eventId": appt_id,"start": new_start};
+
+        upd = invokeurl
+        [
+            url : base_url + "/update"
+            type : POST
+            body : req.toString()
+        ];
+
+        response.put("action","end");
+        response.put("replies",{
+            "🎉 Appointment rescheduled!",
+            "Check your email for confirmation."
+        });
+
+        return response;
+    }
 }
 
-
-
-
-//CANCEL APPOINTMENT
-
-if(context_id == "cancel_appt")
+// AI symptom checker
+if (context_id == "ai_checker")
 {
-	if(!answers.containsKey("email"))
-	{
-		q = {"name":"email","replies":{"Please enter your email to view your appointments:"}};
-		response.put("questions",{q});
-		return response;
-	}
-	if(!answers.containsKey("selected_cancel"))
-	{
-		mail = answers.get("email").get("text");
-		payload = {"email":mail};
-		items = invokeurl
-		[
-			url :base_url + "/list"
-			type :POST
-			body:payload.toString()
-		];
-		if(items.size() == 0)
-		{
-			response.put("action","end");
-			response.put("replies",{" No appointments found for this email."});
-			return response;
-		}
-		opts = List();
-		for each  a in items
-		{
-			start = a.get("start");
-			date = start.substring(0,10);
-			time = start.substring(11,16);
-			id = a.get("id");
-			opts.add(date + " at " + time);
-		}
-		q = Map();
-		q.put("name","selected_cancel");
-		q.put("replies",{"🗓 Select the appointment you want to cancel:"});
-		q.put("input",{"type":"select","options":opts});
-		response.put("questions",{q});
-		return response;
-	}
-	sel = answers.get("selected_cancel").get("text");
-	cancel_id = sel.substring(sel.indexOf(" | ") + 3,sel.length());
-	payload_del = {"eventId":cancel_id};
-	invokeurl
-	[
-		url :base_url + "/delete"
-		type :POST
-		body:payload_del.toString()
-	]
-	response.put("action","end");
-	response.put("replies",{" Your appointment has been cancelled successfully."});
-	return response;
+    // send symptoms to AI
+    if (answers.containsKey("symptoms") && !answers.containsKey("ai_result"))
+    {
+        symptoms = answers.get("symptoms").get("text");
+        payload = {"symptoms": symptoms};
+
+        ai_raw = invokeurl
+        [
+            url : base_url + "/ai/symptom-check"
+            type : POST
+            body : payload.toString()
+        ];
+
+        ai_text = ai_raw.toString().trim();
+
+        try { ai = ai_text.toMap(); }
+        catch (e) { ai = Map(); }
+
+        dept         = if(ai.containsKey("department"), ai.get("department"), "General Medicine");
+        expected_doc = if(ai.containsKey("expected_doctor"), ai.get("expected_doctor"), "General Physician");
+        sev          = if(ai.containsKey("severity"), ai.get("severity"), "Mild");
+        action       = if(ai.containsKey("recommended_action"), ai.get("recommended_action"), "Monitor your symptoms.");
+        follow       = if(ai.containsKey("followup_suggestion"), ai.get("followup_suggestion"), "See a doctor if symptoms worsen.");
+
+        // list conditions
+        cond_str = "";
+        if (ai.containsKey("possible_conditions"))
+        {
+            for each c in ai.get("possible_conditions")
+                cond_str = cond_str + "• " + c + "\n";
+        }
+        else
+        {
+            cond_str = "• Common viral illness\n";
+        }
+
+        // list tips
+        tips_str = "";
+        if (ai.containsKey("general_health_tips"))
+        {
+            for each t in ai.get("general_health_tips")
+                tips_str = tips_str + "• " + t + "\n";
+        }
+        else
+        {
+            tips_str =
+                "• Stay hydrated.\n" +
+                "• Take enough rest.\n" +
+                "• Monitor symptoms regularly.\n";
+        }
+
+        final_text =
+            "🩺 *AI Symptom Check*\n\n" +
+            "🏥 Department: **" + dept + "**\n" +
+            "👨‍⚕️ Doctor: **" + expected_doc + "**\n" +
+            "⚠️ Severity: **" + sev + "**\n\n" +
+            "Possible Conditions:\n" + cond_str + "\n" +
+            "What you can do:\n" + action + "\n\n" +
+            "Follow-up:\n" + follow + "\n\n" +
+            "Health Tips:\n" + tips_str + "\n" +
+            "⚠️ This is AI advice. See a doctor if needed.";
+
+        q = {"name":"ai_result","replies",{final_text}};
+        response.put("questions",{q});
+        return response;
+    }
+
+    // end AI flow
+    if (answers.containsKey("ai_result"))
+    {
+        response.put("action","end");
+        return response;
+    }
 }
 
-
-
-
-// AI SYMPTOM CHECKER 
-
-if(context_id == "ai_checker")
-{
-	if(answers.containsKey("symptoms") && !answers.containsKey("ai_result"))
-	{
-		symptoms = answers.get("symptoms").get("text");
-		payload = {"symptoms":symptoms};
-		ai_raw = invokeurl
-		[
-			url :base_url + "/ai/symptom-check"
-			type :POST
-			body:payload.toString()
-		];
-		// Cleanup
-		ai_text = ai_raw.toString().trim();
-		ai_text = ai_text.replaceAll("```json","");
-		ai_text = ai_text.replaceAll("```","");
-		ai_text = ai_text.trim();
-		
-		start_raw = ai_text.indexOf("{");
-		end_raw = ai_text.lastIndexOf("}");
-		start_str = start_raw.toString();
-		end_str = end_raw.toString();
-		if(start_str != "-1" && end_str != "-1")
-		{
-			start_num = start_str.toNumber();
-			end_num = end_str.toNumber();
-			json_clean = ai_text.substring(start_num,end_num + 1);
-		}
-		else
-		{
-			json_clean = ai_text;
-		}
-		try 
-		{
-			ai = json_clean.toMap();
-		}
-		catch (e)
-		{
-			ai = Map();
-		}
-		dept = if(ai.containsKey("department"),ai.get("department"),"General Medicine");
-		sev = if(ai.containsKey("severity"),ai.get("severity"),"Not specified");
-		cond_text = "";
-		if(ai.containsKey("possible_conditions"))
-		{
-			for each  c in ai.get("possible_conditions")
-			{
-				cond_text = cond_text + "• " + c + "\n";
-			}
-		}
-		rec = if(ai.containsKey("recommended_action"),ai.get("recommended_action"),"");
-		report = "🩺 *AI Symptom Analysis*\n";
-		report = report + "--------------------------------\n";
-		report = report + "🏥 *Recommended Department:* **" + dept + "**\n";
-		report = report + "⚠️ *Severity Level:* **" + sev + "**\n\n";
-		report = report + "🧠 *Possible Conditions:*\n" + cond_text + "\n";
-		report = report + "📝 *Recommended Action:*\n" + rec + "\n";
-		report = report + "--------------------------------\n";
-		report = report + "💡 *Note:* This is an AI-generated preliminary assessment.\nIf symptoms persist, please consult a healthcare professional.";
-		q = {"name":"ai_result","replies":{report}};
-		response.put("questions",{q});
-		return response;
-	}
-	if(answers.containsKey("ai_result"))
-	{
-		response.put("action","end");
-		return response;
-	}
-}
 return response;

@@ -199,9 +199,6 @@ export async function createEvent({ name, email, phone, start }) {
     start: { dateTime: startDt.toISOString(), timeZone: "Asia/Kolkata" },
     end: { dateTime: endDt.toISOString(), timeZone: "Asia/Kolkata" },
 
-    // ❌ REMOVE attendees → removes Google invitation email
-    // attendees: [{ email, displayName: name }],
-
     organizer: {
       email: "vindhya353@gmail.com",
       displayName: "CliniQ Assist",
@@ -217,7 +214,7 @@ export async function createEvent({ name, email, phone, start }) {
   const created = await calendar.events.insert({
     calendarId: "primary",
 
-    // ❗ MOST IMPORTANT — prevents Google sending ANY email
+    
     sendUpdates: "none",
 
     requestBody: eventBody,

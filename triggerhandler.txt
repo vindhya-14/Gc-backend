@@ -1,5 +1,9 @@
 response = Map();
 response.put("action","reply");
-response.put("replies",{"🌿 Hello! You’re chatting with **CliniQ Assist**.\nI’m here to make your healthcare easier. What can I help you with?"});
-response.put("suggestions",{"Book Appointment","Reschedule Appointment","Cancel Appointment","AI Symptom Checker"});
+greet = "🌿 Welcome to **CliniQ Assist** — your virtual healthcare companion.\n\n" + "How can I help you today?";
+response.put("replies",{greet});
+
+response.put("suggestions",{"Booking Services","Manage My Appointments","Help & Tools"});
 return response;
+
+

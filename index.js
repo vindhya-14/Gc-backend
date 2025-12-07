@@ -271,14 +271,14 @@ export default async function handler(req, res) {
       const payment_id = urlObj.searchParams.get("razorpay_payment_id");
       const link_id = urlObj.searchParams.get("razorpay_payment_link_id");
 
-      // Razorpay returns empty requests while verifying link
+     
       if (!payment_id || !link_id) {
         res.statusCode = 200;
         res.end("OK");
         return;
       }
 
-      // Fetch payment details
+     
       const payment = await razor.payments.fetch(payment_id);
       const notes = payment.notes;
 
@@ -287,10 +287,10 @@ export default async function handler(req, res) {
       const phone = notes.phone;
       const start = notes.start;
 
-      // Create Google Calendar event
+      
       const evt = await createEvent({ name, email, phone, start });
 
-      // Email confirmation
+     
       await sendConfirmationEmail({
         to: email,
         name,
@@ -298,7 +298,7 @@ export default async function handler(req, res) {
         date: start,
       });
 
-      // Redirect to thank-you page
+    
       res.writeHead(302, {
         Location: `https://${req.headers.host}/thank-you`,
       });
@@ -306,9 +306,9 @@ export default async function handler(req, res) {
       return;
     }
 
-    /********************************************
- AI SYMPTOM CHECKER (GEMINI)
-********************************************/
+
+ //AI SYMPTOM CHECKER 
+
     if (pathname === "/ai/symptom-check" && req.method === "POST") {
       const { symptoms } = await readBody(req);
 

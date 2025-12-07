@@ -1,457 +1,176 @@
 response = Map();
-if(message == null || !message.containsKey("text"))
+msg = "";
+msg_l = "";
+postback = "";
+value = "";
+
+// read incoming text message
+if(message != null && message.containsKey("text"))
 {
-	return Map();
+    msg = message.get("text");
+    msg_l = msg.toLowerCase();
 }
-msg = message.get("text");
-msg_l = msg.toLowerCase();
-
-/* BOOK APPOINTMENT */
-
-if(msg_l == "book appointment" || msg_l == "book an appointment")
+// read postback value (button clicks)
+if(message != null && message.containsKey("postback"))
 {
-	response.put("action","context");
-	response.put("context_id","book_appt");
-	q = Map();
-	q.put("name","dept");
-	q.put("replies",{"🩺 Great! Please choose the department you need an appointment with:"});
-	q.put("input",{"type":"select","options":{"General Physician","Pediatrics","Cardiology","Dermatology","ENT (Ear, Nose & Throat)","Orthopedics","Gynecology","Neurology","Other"}});
-	response.put("questions",{q});
-	return response;
+    postback = message.get("postback");
 }
-/* RESCHEDULE APPOINTMENT */
-if(msg_l == "reschedule appointment" || msg_l == "reschedule")
+// read widget value
+if(message != null && message.containsKey("value"))
 {
-	response.put("action","context");
-	response.put("context_id","reschedule_appt");
-	q = Map();
-	q.put("name","email");
-	q.put("replies",{"Sure! Please enter the email used while booking your appointment:"});
-	response.put("questions",{q});
-	return response;
+    value = message.get("value");
 }
-/* CANCEL APPOINTMENT */
-if(msg_l == "cancel appointment" || msg_l == "cancel")
+
+info "MSG=" + msg + " | POSTBACK=" + postback + " | VALUE=" + value;
+
+// user clicked "<Service> - Book Now"
+if(msg_l.contains(" - book now"))
 {
-	response.put("action","context");
-	response.put("context_id","cancel_appt");
-	q = Map();
-	q.put("name","email");
-	q.put("replies",{"Please enter your email so I can fetch your appointments:"});
-	response.put("questions",{q});
-	return response;
-}
-/* AI SYMPTOM CHECKER */
-if(msg_l == "ai symptom checker" || msg_l == "symptom checker" || msg_l == "ai")
-{
-	response.put("action","context");
-	response.put("context_id","ai_checker");
-	q = Map();
-	q.put("name","symptoms");
-	q.put("replies",{"Please describe your symptoms briefly so I can analyze them:"});
-	response.put("questions",{q});
-	return response;
-}
-/****************************************
-      DEFAULT FALLBACK
-*****************************************/
-response.put("action","reply");
-response.put("replies",{"I'm here to assist you! 😊 What would you like to do today?"});
-response.put("suggestions",{"Book Appointment","Reschedule Appointment","Cancel Appointment","AI Symptom Checker"});
-return response;
+    pos = msg.indexOf(" - ");
+    service = msg.substring(0,pos);
 
-======================
+    response.put("action","context");
+    response.put("context_id","book_appt");
 
+    svc = {"name":"dept","value":service};
 
-msg = message.get("text");
-msg_l = msg.toLowerCase();
+    q = {"name":"date",
+        "replies":{
+            "📅 Booking for *" + service + "*. Please choose your appointment date:"
+        },
+        "input":{"type":"calendar"}
+    };
 
-/******************************
-   MAIN MENU → SUBMENUS
-******************************/
-
-// 1️⃣ Booking Services → show service cards
-if(msg_l == "booking services")
-{
-    response = Map();
-    response.put("action","reply");
-
-    text = 
-    "🏥 *Appointment Booking Services*\n\n" +
-    "Browse our available services below and click *Book Now* to continue:";
-
-    response.put("replies",{text});
-
-    //-------------------------
-    // SERVICE CAROUSEL CARDS
-    //-------------------------
-    cards = List();
-
-    // General Physician
-    c1 = Map();
-    c1.put("title","General Physician");
-    c1.put("subtitle","Consult for fever, cold, pain & general health issues.");
-    c1.put("image","https://example.com/general.jpg");
-    c1.put("buttons",{
-        {
-            "type":"postback",
-            "text":"Book Now",
-            "payload":"book_service|General Physician"
-        }
-    });
-    cards.add(c1);
-
-    // Cardiology
-    c2 = Map();
-    c2.put("title","Cardiology");
-    c2.put("subtitle","Heart checkups, ECG review & cardiac care.");
-    c2.put("image","https://example.com/cardio.jpg");
-    c2.put("buttons",{
-        {
-            "type":"postback",
-            "text":"Book Now",
-            "payload":"book_service|Cardiology"
-        }
-    });
-    cards.add(c2);
-
-    // Pediatrics
-    c3 = Map();
-    c3.put("title","Pediatrics");
-    c3.put("subtitle","Child health checkups & vaccinations.");
-    c3.put("image","https://example.com/pediatrics.jpg");
-    c3.put("buttons",{
-        {
-            "type":"postback",
-            "text":"Book Now",
-            "payload":"book_service|Pediatrics"
-        }
-    });
-    cards.add(c3);
-
-    // Dermatology
-    c4 = Map();
-    c4.put("title","Dermatology");
-    c4.put("subtitle","Skin, hair & allergy care.");
-    c4.put("image","https://example.com/derma.jpg");
-    c4.put("buttons",{
-        {
-            "type":"postback",
-            "text":"Book Now",
-            "payload":"book_service|Dermatology"
-        }
-    });
-    cards.add(c4);
-
-    // Neurology
-    c5 = Map();
-    c5.put("title","Neurology");
-    c5.put("subtitle","Brain, nerve & neurological issues.");
-    c5.put("image","https://example.com/neuro.jpg");
-    c5.put("buttons",{
-        {
-            "type":"postback",
-            "text":"Book Now",
-            "payload":"book_service|Neurology"
-        }
-    });
-    cards.add(c5);
-
-    response.put("cards", cards);
-    response.put("card_layout","carousel");
-
-    // Suggestions
-    response.put("suggestions",{
-        "⬅ Back to Main Menu"
-    });
-
+    response.put("precollect",{svc});
+    response.put("questions",{q});
     return response;
 }
 
-// 2️⃣ Manage My Appointments
-if(msg_l == "manage my appointments")
+// handle basic greeting
+if(msg_l == "hi" || msg_l == "hello" || msg_l == "hey" || msg_l == "start")
 {
-    response = Map();
     response.put("action","reply");
-
-    text = 
-    "🗂️ *Manage Your Appointments*\n\n" +
-    "Here are the available options:";
-
-    response.put("replies",{text});
-
-    response.put("suggestions",{
-        "My Appointments",
-        "Reschedule Appointment",
-        "Cancel Appointment",
-        "⬅ Back to Main Menu"
+    response.put("replies",{
+        "🌿 Welcome to **CliniQ Assist**.\nHow may I help you today?"
     });
-
-    return response;
-}
-
-// 3️⃣ Help & Tools
-if(msg_l == "help & tools")
-{
-    response = Map();
-    response.put("action","reply");
-
-    text = 
-    "🧑‍⚕️ *Health Assistance & Tools*\n\n" +
-    "Choose an option below:";
-
-    response.put("replies",{text});
-
-    response.put("suggestions",{
-        "AI Symptom Checker",
-        "⬅ Back to Main Menu"
-    });
-
-    return response;
-}
-
-// BACK TO MAIN MENU
-if(msg_l == "⬅ back to main menu" || msg_l == "back to main menu")
-{
-    response = Map();
-    response.put("action","reply");
-
-    main = 
-    "🌿 *Welcome back to the Main Menu!*\n\n" +
-    "Please select a category to continue:";
-
-    response.put("replies",{main});
 
     response.put("suggestions",{
         "Booking Services",
         "Manage My Appointments",
         "Help & Tools"
     });
-
     return response;
 }
 
-/**********************
- DEFAULT FALLBACK
-**********************/
-fallback = Map();
-fallback.put("action","reply");
-fallback.put("replies",{
-    "❓ I didn’t understand that.\n\nPlease choose one of the options below:"
-});
-fallback.put("suggestions",{
-    "Booking Services",
-    "Manage My Appointments",
-    "Help & Tools"
-});
-
-return fallback;
-
-
-=================
-
-
-333
-
-response = Map();
-
-if(message == null || !message.containsKey("text"))
-{
-    return Map();
-}
-
-msg = message.get("text");
-msg_l = msg.toLowerCase();
-
-/***************************************************
- 🌿 MAIN MENU (Trigger by greeting or manual)
-***************************************************/
-if(msg_l == "hi" || msg_l == "hello" || msg_l == "hey" || msg_l == "start" || msg_l == "menu")
+// show booking category menu
+if(msg_l == "booking services")
 {
     response.put("action","reply");
-
-    intro = 
-    "🌿 Welcome to **CliniQ Assist** — your virtual healthcare companion.\n\n" +
-    "How can I help you today? Please choose a category:";
-
-    response.put("replies",{intro});
+    response.put("replies",{
+        "🏥 *Appointment Booking Services*\nChoose an option:"
+    });
 
     response.put("suggestions",{
-        "Booking Services",
-        "Manage My Appointments",
-        "Help & Tools"
+        "Book Appointment",
+        "⬅ Back to Main Menu"
     });
 
     return response;
 }
 
-/***************************************************
- 1️⃣ BOOKING SERVICES → SHOW SERVICE CARDS
-***************************************************/
-if(msg_l == "booking services")
+// show list of departments as cards
+if(msg_l == "book appointment")
 {
     response.put("action","reply");
 
-    intro =
-    "🏥 *Appointment Booking Services*\n\n" +
-    "Please select a medical service below and tap *Book Now* to proceed:";
-
-    /***************************************
-        MULTIPLE-PRODUCT WIDGET
-    ***************************************/
     widget = Map();
     widget.put("type","multiple-product");
-    widget.put("text", intro);
+    widget.put("text","🏥 Please choose a department to continue:");
 
-    elements = List();
+    items = List();
+    placeholder = "https://cdn.pixabay.com/photo/2024/02/16/14/56/man-8577744_1280.jpg";
 
-    /*************** 1️⃣ General Physician ***************/
-    el1 = Map();
-    el1.put("title","General Physician");
-    el1.put("subtitle","Fever, cold, viral infections & general checkups.");
-    el1.put("id","general_physician");
-	  el1.put("image","https://www.degreeadvisers.com/wp-content/uploads/2017/08/A-Career-as-a-General-Physician.jpg");    
+    depts = {
+        {"General Medicine","Fever • Cold • Viral","General Medicine"},
+        {"Pediatrics","Child care • Vaccinations","Pediatrics"},
+        {"Dermatology","Skin allergies • Acne","Dermatology"},
+        {"Orthopedics","Bones • Joints • Injuries","Orthopedics"},
+        {"Gynecology","Women's health • Pregnancy","Gynecology"},
+        {"ENT","Sinus • Ear pain • Throat","ENT"},
+        {"Cardiology","Heart • BP • ECG","Cardiology"},
+        {"Neurology","Headache • Seizures","Neurology"},
+        {"Ophthalmology","Vision • Eye strain","Ophthalmology"},
+        {"Physiotherapy","Pain relief • Rehab","Physiotherapy"}
+    };
 
-    el1_actions = List();
-    btn1 = Map();
-    btn1.put("label","Book Now");
-    btn1.put("name","book_gp");
-    btn1.put("type","reply");
-    btn1.put("value","book_service|General Physician");
-    el1_actions.add(btn1);
-    el1.put("actions",el1_actions);
-    elements.add(el1);
+    for each d in depts
+    {
+        p = Map();
+        p.put("title", d.get(0));
+        p.put("subtitle", d.get(1));
+        p.put("image", placeholder);
 
-    /*************** 2️⃣ Pediatrics ***************/
-    el2 = Map();
-    el2.put("title","Pediatrics");
-    el2.put("subtitle","Child checkups, fever, cold & vaccinations.");
-    el2.put("id","pediatrics");
-    el2.put("image","https://workdrive.zohoexternal.in/file/seruj72f5c7289bfb475fa8bcc83779d2bf25");
+        act = {
+            "label":"Book Now",
+            "type":"postback",
+            "name":"book_service",
+            "value":d.get(2)
+        };
 
-    el2_actions = List();
-    btn2 = Map();
-    btn2.put("label","Book Now");
-    btn2.put("name","book_pedia");
-    btn2.put("type","reply");
-    btn2.put("value","book_service|Pediatrics");
-    el2_actions.add(btn2);
-    el2.put("actions",el2_actions);
-    elements.add(el2);
+        p.put("actions",{act});
+        items.add(p);
+    }
 
-    /*************** 3️⃣ Dermatology ***************/
-    el3 = Map();
-    el3.put("title","Dermatology");
-    el3.put("subtitle","Skin issues, acne, allergies & hair fall treatment.");
-    el3.put("id","dermatology");
-    el3.put("image","https://workdrive.zohoexternal.in/file/seruj8b526d456a4f4308a64908f2672700d1");
-
-    el3_actions = List();
-    btn3 = Map();
-    btn3.put("label","Book Now");
-    btn3.put("name","book_derma");
-    btn3.put("type","reply");
-    btn3.put("value","book_service|Dermatology");
-    el3_actions.add(btn3);
-    el3.put("actions",el3_actions);
-    elements.add(el3);
-
-    /*************** 4️⃣ Cardiology ***************/
-    el4 = Map();
-    el4.put("title","Cardiology");
-    el4.put("subtitle","Chest pain, heart checkups & blood pressure issues.");
-    el4.put("id","cardiology");
-    el4.put("image","https://workdrive.zohoexternal.in/file/seruj72f7403334e64c148c3c53ac49afc70e");
-
-    el4_actions = List();
-    btn4 = Map();
-    btn4.put("label","Book Now");
-    btn4.put("name","book_cardio");
-    btn4.put("type","reply");
-    btn4.put("value","book_service|Cardiology");
-    el4_actions.add(btn4);
-    el4.put("actions",el4_actions);
-    elements.add(el4);
-
-    /*************** 5️⃣ Orthopedics ***************/
-    el5 = Map();
-    el5.put("title","Orthopedics");
-    el5.put("subtitle","Bone, joint, back pain & injury treatments.");
-    el5.put("id","orthopedics");
-    el5.put("image","https://workdrive.zohoexternal.in/file/seruj82e3825b8a324c3eb7f7f0cfa09bab8c");
-
-    el5_actions = List();
-    btn5 = Map();
-    btn5.put("label","Book Now");
-    btn5.put("name","book_ortho");
-    btn5.put("type","reply");
-    btn5.put("value","book_service|Orthopedics");
-    el5_actions.add(btn5);
-    el5.put("actions",el5_actions);
-    elements.add(el5);
-
-    /*************** 6️⃣ Gynecology ***************/
-    el6 = Map();
-    el6.put("title","Gynecology");
-    el6.put("subtitle","Women's health, pregnancy & menstrual issues.");
-    el6.put("id","gynecology");
-    el6.put("image","https://workdrive.zohoexternal.in/file/seruj4f3941d7b0c54a7bb30f3d27fe7074b3");
-
-    el6_actions = List();
-    btn6 = Map();
-    btn6.put("label","Book Now");
-    btn6.put("name","book_gyne");
-    btn6.put("type","reply");
-    btn6.put("value","book_service|Gynecology");
-    el6_actions.add(btn6);
-    el6.put("actions",el6_actions);
-    elements.add(el6);
-
-    /*************** ATTACH ALL CARDS ***************/
-    widget.put("elements",elements);
-
+    widget.put("elements",items);
     response.put("replies",{widget});
-
-    response.put("suggestions",{
-        "⬅ Back to Main Menu"
-    });
-
+    response.put("suggestions",{"⬅ Back to Main Menu"});
     return response;
 }
 
-/***************************************************
- 2️⃣ MANAGE MY APPOINTMENTS
-***************************************************/
-if(msg_l == "manage my appointments")
+// handle user clicking "Book Now" inside the card
+if(postback == "book_service")
 {
-    response.put("action","reply");
+    response.put("action","context");
+    response.put("context_id","book_appt");
 
-    txt =
-    "🗂️ *Manage Your Appointments*\n\nChoose an option:";
+    pre = {
+        {"name":"dept","value":value}
+    };
 
-    response.put("replies",{txt});
+    q = {
+        "name":"date",
+        "replies":{
+            "📅 Booking for *" + value + "*. Please select your preferred date:"
+        },
+        "input":{"type":"calendar"}
+    };
 
-    response.put("suggestions",{
-        "My Appointments",
-        "Reschedule Appointment",
-        "Cancel Appointment",
-        "⬅ Back to Main Menu"
+    response.put("precollect",pre);
+    response.put("questions",{q});
+    return response;
+}
+
+// start appointment lookup flow
+if(msg_l == "manage my appointments" || msg_l == "my appointments" || msg_l == "manage appointments")
+{
+    response.put("action","context");
+    response.put("context_id","my_appts");
+
+    response.put("questions",{
+        {"name":"lookup","replies":{"🔍 Enter your booking email:"}}
     });
 
     return response;
 }
 
-/***************************************************
- 3️⃣ HELP & TOOLS
-***************************************************/
+// open help + tools area
 if(msg_l == "help & tools")
 {
     response.put("action","reply");
 
-    txt =
-    "🧑‍⚕️ *Help & Tools*\n\nChoose an option:";
-
-    response.put("replies",{txt});
+    response.put("replies",{
+        "🛠 *Help & Tools*\nChoose a tool:"
+    });
 
     response.put("suggestions",{
         "AI Symptom Checker",
@@ -461,39 +180,34 @@ if(msg_l == "help & tools")
     return response;
 }
 
-/***************************************************
- ⬅ BACK TO MAIN MENU
-***************************************************/
-if(msg_l == "⬅ back to main menu" || msg_l == "back to main menu")
+// start AI symptom checker flow
+if(msg_l == "ai symptom checker")
 {
-    response.put("action","reply");
+    response.put("action","context");
+    response.put("context_id","ai_checker");
 
-    main =
-    "🌿 *Main Menu*\n\nSelect a category:";
+    q = {
+        "name":"symptoms",
+        "replies":{
+            "🩺 Please describe your symptoms:",
+            "Example: *fever, headache, chest pain*"
+        }
+    };
 
-    response.put("replies",{main});
-
-    response.put("suggestions",{
-        "Booking Services",
-        "Manage My Appointments",
-        "Help & Tools"
-    });
-
+    response.put("questions",{q});
     return response;
 }
 
-/***************************************************
- ❓ FALLBACK
-***************************************************/
-fallback = Map();
-fallback.put("action","reply");
-fallback.put("replies",{
-    "❓ I didn't understand that.\nPlease choose one of the options below:"
+// default fallback message when bot can't understand
+response.put("action","reply");
+response.put("replies",{
+    "❓ I didn’t understand. Please choose an option:"
 });
-fallback.put("suggestions",{
+
+response.put("suggestions",{
     "Booking Services",
     "Manage My Appointments",
     "Help & Tools"
 });
 
-return fallback;
+return response;
