@@ -1,112 +1,107 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-import Groq from "groq-sdk";
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 export async function symptomCheck(symptoms) {
- const prompt = `
-You are an advanced medical triage AI assistant. Your job is to analyze the user's symptoms and produce a STRICT JSON output with NO extra text. 
+  const prompt = `
+You are an advanced medical triage assistant with strong diagnostic reasoning.  
+Your ONLY task is to analyze the symptoms and output a STRICT JSON response.
 
-Your response must follow this JSON structure EXACTLY:
+==========================
+ USER SYMPTOMS
+==========================
+"${symptoms}"
+
+==========================
+ REQUIRED JSON FORMAT
+==========================
+The output MUST be EXACTLY in this structure:
 
 {
   "department": "",
+  "expected_doctor": "",
   "severity": "",
   "possible_conditions": [],
-  "recommended_action": "",
-  "followup_suggestion": ""
+  "recommended_action": ""
 }
 
-==============================
-INSTRUCTIONS & CLASSIFICATION RULES
-==============================
+NO markdown.  
+NO explanation.  
+NO text before or after the JSON.  
+Only PURE JSON.
 
-1️⃣ **DEPARTMENT CLASSIFICATION RULES**
-Choose the MOST relevant medical department based on symptoms:
+==========================
+ CLASSIFICATION RULES
+==========================
 
-- **Heart/Cardiac Related** → "Cardiology"
-   - chest pain, left arm pain, breathlessness, palpitations, dizziness with chest discomfort, heavy chest, sweating with chest pain
+1️⃣ **DEPARTMENT & EXPECTED DOCTOR MAPPING**
 
-- **Cold, Fever, Sore throat, Cough, Flu, Viral, Infection symptoms** → "General Medicine"
+- Fever, chills, viral infection, cold, throat pain →  
+  department: "General Medicine", expected_doctor: "General Physician"
 
-- **Skin issues** → "Dermatology"
-   - rash, itching, redness, acne, fungal infection, pigmentation, eczema
+- Chest pain, left arm pain, breathlessness, palpitations, pressure on chest →  
+  department: "Cardiology", expected_doctor: "Cardiologist"
 
-- **Bones, joints, swelling, injury, pain when moving** → "Orthopedics"
+- Skin rash, acne, itching, fungal infection, eczema, allergies →  
+  department: "Dermatology", expected_doctor: "Dermatologist"
 
-- **Eye symptoms** → "Ophthalmology"
-   - redness, burning, blurred vision, irritation, swelling, dryness, discharge
+- Joint pain, knee pain, fractures, muscle injuries, back pain →  
+  department: "Orthopedics", expected_doctor: "Orthopedic Surgeon"
 
-- **Mental health symptoms** → "Psychiatry"
-   - stress, anxiety, panic, mood swings, sleep issues, overthinking
+- Period issues, cramps, pregnancy symptoms, vaginal concerns →  
+  department: "Gynecology", expected_doctor: "Gynecologist"
 
-- **Women’s health issues** → "Gynecology"
-   - period problems, cramps, PCOS symptoms, vaginal discharge, pregnancy concerns
+- Headache, migraine, dizziness, seizures, numbness, tingling →  
+  department: "Neurology", expected_doctor: "Neurologist"
 
-- **Stomach & digestive issues** → "Gastroenterology"
-   - acidity, stomach pain, diarrhea, vomiting, constipation, digestion problems
+- Eye redness, blurred vision, irritation, dryness, discharge →  
+  department: "Ophthalmology", expected_doctor: "Ophthalmologist"
 
-- **Urine-related symptoms** → "Urology"
-   - burning urination, frequent urination, lower abdominal pressure, kidney pain
+- Anxiety, panic, depression, anger, stress, insomnia →  
+  department: "Psychiatry", expected_doctor: "Psychiatrist"
 
-- If no clear classification → choose the **closest matching department**.
+- If the symptoms do not clearly fit any category →  
+  department: "General Medicine", expected_doctor: "General Physician"
 
-2️⃣ **SEVERITY LEVEL RULES**
+==========================
+ SEVERITY RULES
+==========================
 Severity MUST be one of:
-- "mild" → symptoms manageable, no danger signs
-- "moderate" → needs attention but not emergency
-- "severe" → red flag or potentially dangerous symptoms
 
-Danger signs → automatically **severe**:
-- chest pain
-- difficulty breathing
-- sudden vision loss
-- fainting
-- severe bleeding
-- very high fever
-- severe abdominal pain
+- "Mild" → minor discomfort, manageable symptoms  
+- "Moderate" → needs medical review but not urgent  
+- "High" → red-flag symptoms or potential emergency
 
-3️⃣ **POSSIBLE CONDITIONS**
-- Return 2–5 most likely conditions.
-- Use general medical reasoning.
-- Make them realistic but NOT extreme unless symptoms demand it.
+Red-flag symptoms that AUTOMATICALLY mean **High severity**:
+- chest pain  
+- trouble breathing  
+- fainting  
+- severe headache  
+- sudden vision changes  
+- uncontrolled bleeding  
+- very high fever  
+- seizures  
+- severe abdominal pain  
 
-4️⃣ **RECOMMENDED ACTION**
-Provide clear, simple medical advice:
-- Home care steps if mild.
-- Visit a doctor if moderate.
-- Urgent or emergency care if severe.
+==========================
+ POSSIBLE CONDITIONS RULES
+==========================
+- Must contain **2–5 medically valid** conditions.  
+- Keep conditions realistic for the symptoms.  
+- Avoid extremely rare diseases.
 
-5️⃣ **FOLLOW-UP SUGGESTION RULES**
-Based on final department:
+==========================
+ RECOMMENDED ACTION RULES
+==========================
+Must be **one simple, actionable instruction** such as:
+- "Monitor symptoms and stay hydrated."
+- "Visit a cardiologist urgently."
+- "Use cold compress and consult a dermatologist."
+- "Seek immediate medical evaluation."
 
-- **Cardiology** → "Immediate cardiology consultation advised."
-- **General Medicine** → "Monitor symptoms and consult a general physician if symptoms persist or worsen."
-- **Dermatology** → "Book a dermatologist visit for proper diagnosis and treatment."
-- **Orthopedics** → "Follow up with an orthopedic specialist for imaging or physical evaluation."
-- **Ophthalmology** → "Get an eye examination from an ophthalmologist."
-- **Psychiatry** → "Consider talking to a mental health specialist for proper evaluation."
-- **Gynecology** → "Follow up with a gynecologist for a complete assessment."
-- **Gastroenterology** → "Consult a gastroenterologist if symptoms continue."
-- **Urology** → "Visit a urologist for urine tests and evaluation."
-- **Default** → "Consult a doctor for a clinical evaluation."
+DO NOT mention the JSON rules or meta-information inside the output.
 
-==============================
-STRICT RULES
-==============================
-
-- OUTPUT MUST BE VALID JSON ONLY.
-- NO markdown, no explanation, no natural language outside JSON.
-- Do NOT include backticks.
-- Do NOT break JSON.
-- No extra fields.
-- Think step-by-step internally but output ONLY the final JSON.
-
-Symptoms provided by the user: "${symptoms}"
-`;
-
+==========================
+ FINAL INSTRUCTION
+==========================
+Think step-by-step internally, but output ONLY the final JSON.
+  `;
 
   const completion = await groq.chat.completions.create({
     model: "llama-3.1-8b-instant",
