@@ -31,26 +31,12 @@ if (context_id == "book_appt")
         return response;
     }
 
-    // ask phone
-    if (!answers.containsKey("phone"))
-    {
-        q = Map();
-        q.put("name","phone");
-        q.put("replies",{"📱 Please enter your mobile number."});
-
-        v = {"format":"phoneno","error":"❌ Invalid mobile number."};
-        q.put("validate", v);
-
-        response.put("questions",{q});
-        return response;
-    }
-
     // send OTP
-    if (answers.containsKey("phone") && !answers.containsKey("phone_otp"))
+    if (answers.containsKey("email") && !answers.containsKey("email_otp"))
     {
-        phone = answers.get("phone").get("text");
+        email = answers.get("email").get("text");
 
-        payload = {"phone":phone};
+        payload = {"email":email};
 
         invokeurl
         [
@@ -60,9 +46,9 @@ if (context_id == "book_appt")
         ];
 
         q = Map();
-        q.put("name","phone_otp");
+        q.put("name","email_otp");
         q.put("replies",{
-            "📩 OTP sent to **" + phone + "**.",
+            "📩 OTP sent to **" + email + "**.",
             "Please enter the 6-digit code."
         });
 
@@ -71,12 +57,12 @@ if (context_id == "book_appt")
     }
 
     // verify OTP
-    if (answers.containsKey("phone_otp") && !answers.containsKey("otp_verified"))
+    if (answers.containsKey("email_otp") && !answers.containsKey("otp_verified"))
     {
-        phone = answers.get("phone").get("text");
-        otp = answers.get("phone_otp").get("text");
+        email = answers.get("email").get("text");
+        otp = answers.get("email_otp").get("text");
 
-        payload = {"phone":phone, "otp":otp};
+        payload = {"email":email, "otp":otp};
 
         verifyResp = invokeurl
         [
@@ -90,8 +76,8 @@ if (context_id == "book_appt")
             q = Map();
             q.put("name","otp_verified");
             q.put("replies",{
-                "✅ Number verified!",
-                "Tap Continue to pick your date."
+                "✅ Email verified!",
+                "Tap Continue to proceed."
             });
 
             inp = {"type":"select","options":{"Continue"}};
@@ -108,8 +94,22 @@ if (context_id == "book_appt")
         }
     }
 
+    // ask phone
+    if (answers.containsKey("otp_verified") && !answers.containsKey("phone"))
+    {
+        q = Map();
+        q.put("name","phone");
+        q.put("replies",{"📱 Please enter your mobile number."});
+
+        v = {"format":"phoneno","error":"❌ Invalid mobile number."};
+        q.put("validate", v);
+
+        response.put("questions",{q});
+        return response;
+    }
+
     // ask date
-    if (answers.containsKey("otp_verified") && !answers.containsKey("date"))
+    if (answers.containsKey("phone") && !answers.containsKey("date"))
     {
         q = Map();
         q.put("name","date");
@@ -368,20 +368,12 @@ if(context_id == "my_appts")
         return response;
     }
 
-    // start reschedule → ask phone
-    if(answers.containsKey("appt_action") && answers.get("appt_action").get("text") == "Reschedule" && !answers.containsKey("r_phone"))
+    // start reschedule → send OTP to lookup email
+    if(answers.containsKey("appt_action") && answers.get("appt_action").get("text") == "Reschedule" && !answers.containsKey("r_email_otp"))
     {
-        q = {"name":"r_phone","replies":{"📱 Enter your phone number:"},"validate":{"format":"phoneno","error":"❌ Invalid phone"}};
-        response.put("questions",{q});
-        return response;
-    }
+        email = answers.get("lookup").get("text");
 
-    // send OTP for reschedule
-    if(answers.containsKey("r_phone") && !answers.containsKey("r_phone_otp"))
-    {
-        phone = answers.get("r_phone").get("text");
-
-        req = {"phone":phone};
+        req = {"email":email};
 
         invokeurl
         [
@@ -390,18 +382,18 @@ if(context_id == "my_appts")
             body : req.toString()
         ];
 
-        q = {"name":"r_phone_otp","replies":{"📩 OTP sent to **" + phone + "**.","Enter OTP:"}};
+        q = {"name":"r_email_otp","replies":{"📩 OTP sent to **" + email + "**.","Enter OTP to verify rescheduling:"}};
         response.put("questions",{q});
         return response;
     }
 
     // verify OTP for reschedule
-    if(answers.containsKey("r_phone_otp") && !answers.containsKey("r_otp_verified"))
+    if(answers.containsKey("r_email_otp") && !answers.containsKey("r_otp_verified"))
     {
-        phone = answers.get("r_phone").get("text");
-        otp   = answers.get("r_phone_otp").get("text");
+        email = answers.get("lookup").get("text");
+        otp   = answers.get("r_email_otp").get("text");
 
-        req = {"phone":phone,"otp":otp};
+        req = {"email":email,"otp":otp};
 
         verify = invokeurl
         [
@@ -414,7 +406,7 @@ if(context_id == "my_appts")
         {
             q = {
                 "name":"r_otp_verified",
-                "replies":{"✅ Phone verified!","Tap Continue to pick a new date."},
+                "replies":{"✅ Email verified!","Tap Continue to pick a new date."},
                 "input":{"type":"select","options":{"Continue"}}
             };
             response.put("questions",{q});

@@ -1,43 +1,57 @@
-import axios from "axios";
+import nodemailer from "nodemailer";
 
 export const otpStore = {};
 
-export async function sendOTP(phone) {
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_FROM,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+export async function sendOTP(email) {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  
-  otpStore[phone] = otp;
+  otpStore[email] = otp;
 
   console.log("\n========================================");
-  console.log(`[DEV] OTP for ${phone}: ${otp}`);
+  console.log(`[DEV] Check OTP for ${email}: ${otp}`);
   console.log("========================================\n");
 
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 16px; color: #333;">
+      <h2 style="color: #2E7D32;">Your Verification Code</h2>
+      <p>Hi there,</p>
+      <p>Your one-time password (OTP) for CliniQ Assist is:</p>
+      <div style="font-size: 24px; font-weight: bold; margin: 20px 0; padding: 16px; background: #f7f7f7; border-radius: 8px; text-align: center; letter-spacing: 4px;">
+        ${otp}
+      </div>
+      <p>If you didn't request this code, you can safely ignore this email.</p>
+      <p style="margin-top: 24px;">Thank you for choosing <strong>CliniQ Assist</strong>.</p>
+    </div>
+  `;
+
   try {
-    // ⚠️ Fast2SMS OTP route (requires proper setup)
-    const response = await axios.get("https://www.fast2sms.com/dev/bulkV2", {
-      params: {
-        authorization: process.env.FAST2SMS_API_KEY,
-        route: "otp", 
-        variables_values: otp, 
-        numbers: phone,
-      },
+    await transporter.sendMail({
+      from: `CliniQ Assist <${process.env.EMAIL_FROM}>`,
+      to: email,
+      subject: "Your CliniQ Assist Verification Code",
+      html,
     });
 
-    console.log("[Fast2SMS Response]:", response.data);
-
+    console.log(`[Email OTP] Successfully sent to ${email}`);
     return true;
   } catch (err) {
-    console.error("\n[Fast2SMS ERROR]");
-    console.error(err?.response?.data || err.message);
-
-    
-    return true;
+    console.error("\n[Email OTP ERROR]");
+    console.error(err.message || err);
+    return false;
   }
 }
 
-export async function verifyOTP(phone, otp) {
-  if (otpStore[phone] && otpStore[phone] === otp) {
-    delete otpStore[phone];
+export async function verifyOTP(email, otp) {
+  if (otpStore[email] && otpStore[email] === otp) {
+    delete otpStore[email];
     return true;
   }
   return false;

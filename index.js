@@ -180,19 +180,21 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     SEND OTP (PHONE ONLY)
+     SEND OTP (EMAIL)
     ********************************************/
     if (pathname === "/send-otp" && req.method === "POST") {
-      const { phone } = await readBody(req);
+      const { email } = await readBody(req);
 
-      if (!phone) {
+      if (!email) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing phone" }));
+        res.end(JSON.stringify({ error: "Missing email" }));
         return;
       }
 
       try {
-        await sendOTP(phone);
+        const sent = await sendOTP(email);
+        
+        if (!sent) throw new Error("Failed to send OTP email");
 
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ success: true }));
@@ -205,19 +207,19 @@ export default async function handler(req, res) {
     }
 
     /********************************************
-     VERIFY OTP (PHONE ONLY)
+     VERIFY OTP (EMAIL)
     ********************************************/
     if (pathname === "/verify-otp" && req.method === "POST") {
-      const { phone, otp } = await readBody(req);
+      const { email, otp } = await readBody(req);
 
-      if (!phone || !otp) {
+      if (!email || !otp) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing phone or otp" }));
+        res.end(JSON.stringify({ error: "Missing email or otp" }));
         return;
       }
 
       try {
-        const valid = await verifyOTP(phone, otp);
+        const valid = await verifyOTP(email, otp);
 
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ valid }));
