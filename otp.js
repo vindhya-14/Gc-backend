@@ -7,6 +7,12 @@ export async function sendOTP(phone) {
 
   otpStore[phone] = otp;
 
+  // IMPORTANT: For development/hackathon purposes, log the OTP in the console
+  // because Fast2SMS often blocks the 'q' route due to DND registry in India.
+  console.log(`\n========================================`);
+  console.log(`[DEVELOPMENT] OTP for ${phone} is: ${otp}`);
+  console.log(`========================================\n`);
+
   const message = `Your CliniQ Assist verification code is: ${otp}`;
 
   try {
@@ -22,8 +28,10 @@ export async function sendOTP(phone) {
 
     return true;
   } catch (err) {
-    console.error("Fast2SMS Error:", err?.response?.data || err);
-    return false;
+    console.error("\n[Fast2SMS Error] SMS Failed. However, you can use the OTP logged above.");
+    console.error("Reason:", err?.response?.data?.message || err?.message || err);
+    // Returning true anyway so the frontend doesn't break and you can test the OTP flow
+    return true; 
   }
 }
 

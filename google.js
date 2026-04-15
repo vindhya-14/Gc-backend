@@ -20,8 +20,8 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 /* --------------------------------------------
    EMAIL (ONLY USED FOR APPOINTMENT CONFIRMATION)
 --------------------------------------------- */
-const MAIL_USER = process.env.MAIL_USER;
-const MAIL_PASS = process.env.MAIL_PASS;
+const MAIL_USER = process.env.EMAIL_FROM;
+const MAIL_PASS = process.env.EMAIL_PASS;
 
 if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URL) {
   throw new Error("Missing Google OAuth env vars.");
