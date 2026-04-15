@@ -18,7 +18,7 @@ export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
   // Build email HTML
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 16px; color: #333;">
-      <h2 style="color: #2E7D32;">Appointment Confirmed ✔</h2>
+      <h2 style="color: #2E7D32;">Appointment Confirmed </h2>
 
       <p>Hi <strong>${name}</strong>,</p>
 
@@ -43,7 +43,7 @@ export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
   await transporter.sendMail({
     from: `CliniQ Assist <${process.env.EMAIL_FROM}>`, // sender name
     to,
-    subject: "Your Appointment is Confirmed – CliniQ Assist ✔",
+    subject: "Your Appointment is Confirmed – CliniQ Assist",
     html,
   });
 }
