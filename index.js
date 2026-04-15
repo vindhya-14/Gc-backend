@@ -17,7 +17,7 @@ const {
 
 // Phone OTP + Email
 import { sendOTP, verifyOTP } from "./otp.js";
-import { sendConfirmationEmail } from "./sendEmail.js";
+import { sendConfirmationEmail, sendRescheduleEmail } from "./sendEmail.js";
 
 import { symptomCheck } from "./ai.js";
 
@@ -154,6 +154,23 @@ export default async function handler(req, res) {
       }
 
       const updated = await updateEvent(eventId, start);
+
+      const desc = updated.description || "";
+      const emailMatch = desc.match(/Email:\s*(.+)/);
+      const nameMatch = desc.match(/Patient Name:\s*(.+)/);
+
+      if (emailMatch && nameMatch) {
+        const email = emailMatch[1].trim();
+        const name = nameMatch[1].trim();
+        
+        // Send reschedule confirmation email
+        await sendRescheduleEmail({
+          to: email,
+          name,
+          appointmentId: eventId,
+          date: start,
+        }).catch(err => console.error("Failed to send reschedule email:", err));
+      }
 
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(updated));
