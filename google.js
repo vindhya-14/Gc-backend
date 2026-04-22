@@ -4,22 +4,15 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
 
-/* --------------------------------------------
-   GOOGLE OAUTH CONFIG
---------------------------------------------- */
+
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URL = process.env.REDIRECT_URL;
 
-/* --------------------------------------------
-   SUPABASE CONFIG (ONLY FOR OAUTH TOKEN STORAGE)
---------------------------------------------- */
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-/* --------------------------------------------
-   EMAIL (ONLY USED FOR APPOINTMENT CONFIRMATION)
---------------------------------------------- */
+
 const MAIL_USER = process.env.EMAIL_FROM;
 const MAIL_PASS = process.env.EMAIL_PASS;
 
@@ -35,12 +28,10 @@ if (!MAIL_USER || !MAIL_PASS) {
   );
 }
 
-// Supabase client (used only for storing OAuth tokens)
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-/* --------------------------------------------
-   GOOGLE OAUTH CLIENT
---------------------------------------------- */
+
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,
   CLIENT_SECRET,
@@ -49,9 +40,7 @@ const oauth2Client = new google.auth.OAuth2(
 
 const SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
-/* --------------------------------------------
-   TOKEN STORAGE
---------------------------------------------- */
+
 async function getTokens() {
   const { data } = await supabase
     .from("oauth_tokens")
@@ -74,9 +63,7 @@ async function saveTokens(tokens) {
   await supabase.from("oauth_tokens").upsert(row, { returning: "minimal" });
 }
 
-/* --------------------------------------------
-   OAUTH HELPERS
---------------------------------------------- */
+
 export function startAuth() {
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
@@ -114,9 +101,7 @@ async function authorize() {
   return oauth2Client;
 }
 
-/* --------------------------------------------
-   GET AVAILABLE SLOTS
---------------------------------------------- */
+
 export async function getFreeBusy(date, tzOffset = "+05:30") {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
@@ -182,15 +167,13 @@ export async function getFreeBusy(date, tzOffset = "+05:30") {
   };
 }
 
-/* --------------------------------------------
-   CREATE APPOINTMENT EVENT
---------------------------------------------- */
+
 export async function createEvent({ name, email, phone, start }) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
 
   const startDt = new Date(start);
-  const endDt = new Date(startDt.getTime() + 30 * 60000); // 30 mins
+  const endDt = new Date(startDt.getTime() + 30 * 60000); 
 
   const eventBody = {
     summary: `CliniQ Assist – Appointment for ${name}`,
@@ -223,9 +206,7 @@ export async function createEvent({ name, email, phone, start }) {
   return created.data;
 }
 
-/* --------------------------------------------
-   LIST UPCOMING EVENTS FOR USER
---------------------------------------------- */
+
 export async function listEvents(email) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
@@ -248,9 +229,7 @@ export async function listEvents(email) {
   }));
 }
 
-/* --------------------------------------------
-   UPDATE (RESCHEDULE)
---------------------------------------------- */
+
 export async function updateEvent(eventId, newStart) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
@@ -271,12 +250,16 @@ export async function updateEvent(eventId, newStart) {
   return updated.data;
 }
 
-/* --------------------------------------------
-   DELETE APPOINTMENT
---------------------------------------------- */
+
 export async function deleteEvent(eventId) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
+
+  // Fetch event details before deleting (for cancellation email)
+  const event = await calendar.events.get({
+    calendarId: "primary",
+    eventId,
+  });
 
   await calendar.events.delete({
     calendarId: "primary",
@@ -284,12 +267,10 @@ export async function deleteEvent(eventId) {
     sendUpdates: "all",
   });
 
-  return { success: true };
+  return { success: true, event: event.data };
 }
 
-/* --------------------------------------------
-   SEND APPOINTMENT CONFIRMATION EMAIL
---------------------------------------------- */
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: { user: MAIL_USER, pass: MAIL_PASS },
@@ -315,9 +296,6 @@ export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
   });
 }
 
-/* --------------------------------------------
-   EXPORT
---------------------------------------------- */
 export default {
   startAuth,
   handleCallback,

@@ -1,21 +1,17 @@
 import nodemailer from "nodemailer";
 
-// -----------------------------------------
-// CREATE TRANSPORTER (must be defined here)
-// -----------------------------------------
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_FROM, // example: cliniqassist@gmail.com
+    user: process.env.EMAIL_FROM, 
     pass: process.env.EMAIL_PASS,
   },
 });
 
-// -----------------------------------------
-// SEND CONFIRMATION EMAIL
-// -----------------------------------------
+
 export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
-  // Build email HTML
+  
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 16px; color: #333;">
       <h2 style="color: #2E7D32;">Appointment Confirmed </h2>
@@ -37,9 +33,7 @@ export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
     </div>
   `;
 
-  // -----------------------------------------
-  // SEND EMAIL
-  // -----------------------------------------
+  
   await transporter.sendMail({
     from: `CliniQ Assist <${process.env.EMAIL_FROM}>`, 
     to,
@@ -48,9 +42,7 @@ export async function sendConfirmationEmail({ to, name, appointmentId, date }) {
   });
 }
 
-// -----------------------------------------
-// SEND RESCHEDULE EMAIL
-// -----------------------------------------
+
 export async function sendRescheduleEmail({ to, name, appointmentId, date }) {
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 16px; color: #333;">
@@ -77,6 +69,40 @@ export async function sendRescheduleEmail({ to, name, appointmentId, date }) {
     from: `CliniQ Assist <${process.env.EMAIL_FROM}>`,
     to,
     subject: "Your Appointment has been Rescheduled – CliniQ Assist",
+    html,
+  });
+}
+
+
+export async function sendCancellationEmail({ to, name, appointmentId }) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 16px; color: #333;">
+      <h2 style="color: #C62828;">Appointment Cancelled ❌</h2>
+
+      <p>Hi <strong>${name}</strong>,</p>
+
+      <p>Your appointment has been successfully cancelled. Below are the details:</p>
+
+      <div style="margin: 20px 0; padding: 16px; background: #ffebee; border-radius: 8px;">
+        <p><strong>Appointment ID:</strong> ${appointmentId}</p>
+      </div>
+
+      <div style="margin: 20px 0; padding: 16px; background: #e8f5e9; border-left: 4px solid #2E7D32; border-radius: 8px;">
+        <p style="margin: 0; color: #2E7D32;"><strong>💰 Refund Notice:</strong> If a payment was made for this appointment, the full amount will be refunded to your original payment method within 5–7 business days.</p>
+      </div>
+
+      <p>If you wish to book a new appointment, feel free to reach out anytime—we're here to help.</p>
+
+      <p style="margin-top: 24px;">Thank you for choosing <strong>CliniQ Assist</strong>.</p>
+
+      <p style="margin-top: 16px;">Warm regards,<br /><strong>CliniQ Assist Team</strong></p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `CliniQ Assist <${process.env.EMAIL_FROM}>`,
+    to,
+    subject: "Your Appointment has been Cancelled – CliniQ Assist",
     html,
   });
 }

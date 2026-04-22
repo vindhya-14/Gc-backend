@@ -100,10 +100,7 @@ Think internally, but output ONLY the JSON.
 
   let result = completion.choices[0].message.content;
 
-  /*********************************************
-   OPTIONAL SAFETY OVERRIDE (HIGHLY RECOMMENDED)
-   Ensures chest pain NEVER goes to General Medicine
-  *********************************************/
+ 
   try {
     const parsed = JSON.parse(result);
     const lower = symptoms.toLowerCase();
@@ -135,7 +132,7 @@ Think internally, but output ONLY the JSON.
         "Visit a cardiologist or emergency department right away.";
     }
 
-    // ADD GENERAL HEALTH TIPS ALWAYS (even if AI misses it)
+    
     parsed.general_health_tips = [
       "Stay hydrated and get adequate rest.",
       "Avoid stress and heavy physical exertion.",
@@ -144,7 +141,7 @@ Think internally, but output ONLY the JSON.
 
     result = JSON.stringify(parsed);
   } catch (e) {
-    // Fallback JSON if AI output breaks
+    
     result = JSON.stringify({
       department: "General Medicine",
       expected_doctor: "General Physician",
