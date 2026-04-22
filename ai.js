@@ -102,64 +102,63 @@ Think internally, but output ONLY the JSON.
     temperature: 0.1,
   });
 
-  let result = completion.choices[0].message.content;
+  let raw = completion.choices[0].message.content;
 
- 
+  // Strip markdown code fences if present (```json ... ```)
+  raw = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+
+  const lower = symptoms.toLowerCase();
+
+  const redFlags = [
+    "chest pain",
+    "left arm pain",
+    "breath",
+    "difficulty breathing",
+    "palpit",
+    "pressure",
+    "severe headache",
+    "fainting",
+    "seizure",
+    "vision loss",
+    "severe abdominal",
+    "bleeding",
+  ];
+
+  const hasRedFlag = redFlags.some((flag) => lower.includes(flag));
+
+  let parsed;
+
   try {
-    const parsed = JSON.parse(result);
-    const lower = symptoms.toLowerCase();
-
-    const redFlags = [
-      "chest pain",
-      "left arm pain",
-      "breath",
-      "difficulty breathing",
-      "palpit",
-      "pressure",
-      "severe headache",
-      "fainting",
-      "seizure",
-      "vision loss",
-      "severe abdominal",
-      "bleeding",
-    ];
-
-    const hasRedFlag = redFlags.some((flag) => lower.includes(flag));
-
-    if (hasRedFlag) {
-      parsed.department = "Cardiology";
-      parsed.expected_doctor = "Cardiologist";
-      parsed.severity = "High";
-      parsed.recommended_action =
-        "Seek immediate emergency medical evaluation.";
-      parsed.followup_suggestion =
-        "Visit a cardiologist or emergency department right away.";
-    }
-
-    
-    parsed.general_health_tips = [
-      "Stay hydrated and get adequate rest.",
-      "Avoid stress and heavy physical exertion.",
-      "Monitor symptoms regularly and seek help if they worsen.",
-    ];
-
-    result = JSON.stringify(parsed);
+    parsed = JSON.parse(raw);
   } catch (e) {
-    
-    result = JSON.stringify({
+    // If LLM response can't be parsed, use safe defaults
+    parsed = {
       department: "General Medicine",
       expected_doctor: "General Physician",
       severity: "Mild",
       possible_conditions: ["General viral illness"],
       recommended_action: "Monitor symptoms and stay hydrated.",
       followup_suggestion: "Consult a general physician if symptoms persist.",
-      general_health_tips: [
-        "Stay hydrated and get adequate rest.",
-        "Avoid stress and heavy physical exertion.",
-        "Monitor symptoms regularly and seek help if they worsen.",
-      ],
-    });
+    };
   }
 
-  return result;
+  // Always override for red-flag symptoms
+  if (hasRedFlag) {
+    parsed.department = "Cardiology";
+    parsed.expected_doctor = "Cardiologist";
+    parsed.severity = "High";
+    parsed.recommended_action =
+      "Seek immediate emergency medical evaluation.";
+    parsed.followup_suggestion =
+      "Visit a cardiologist or emergency department right away.";
+  }
+
+  // Always include standard health tips
+  parsed.general_health_tips = [
+    "Stay hydrated and get adequate rest.",
+    "Avoid stress and heavy physical exertion.",
+    "Monitor symptoms regularly and seek help if they worsen.",
+  ];
+
+  return JSON.stringify(parsed);
 }
