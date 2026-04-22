@@ -255,7 +255,7 @@ export async function deleteEvent(eventId) {
   const auth = await authorize();
   const calendar = google.calendar({ version: "v3", auth });
 
-  // Fetch event details before deleting (for cancellation email)
+  
   const event = await calendar.events.get({
     calendarId: "primary",
     eventId,

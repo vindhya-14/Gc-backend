@@ -175,7 +175,7 @@ export default async function handler(req, res) {
 
       const result = await deleteEvent(eventId);
 
-      // Send cancellation email with refund notice
+      
       const desc = result.event?.description || "";
       const emailMatch = desc.match(/Email:\s*(.+)/);
       const nameMatch = desc.match(/Patient Name:\s*(.+)/);

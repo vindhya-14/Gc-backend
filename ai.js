@@ -1,3 +1,7 @@
+import Groq from "groq-sdk";
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
 export async function symptomCheck(symptoms) {
   const prompt = `
 You are a clinical-grade medical triage assistant. Your response must be highly accurate and ALWAYS returned as a STRICT JSON object.
